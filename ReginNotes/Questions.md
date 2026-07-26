@@ -2420,3 +2420,324 @@ When you see questions regarding model customization and data preparation on the
     
 - _"Where is training data stored for Bedrock fine-tuning?"_ ➔ **Amazon S3**
 ________
+A developer needs to deploy a custom, fine-tuned Llama 3 model for real-time inference using Amazon SageMaker. To minimize latency and maximize throughput, which type of SageMaker endpoint configuration is generally recommended for production traffic? 
+
+Asynchronous Endpoint 
+
+Batch Transform Job 
+
+Multi-Model Endpoint (MME) 
+
+Standard Real-Time Endpoint 
+
+The correct answer is **Standard Real-Time Endpoint**.
+
+### Why This Is the Correct Solution
+
+When the primary requirements for a model deployment are **real-time inference**, **minimal latency**, and **maximum throughput**, a dedicated **Standard Real-Time Endpoint** is the architectural best practice on Amazon SageMaker.
+
+A standard real-time endpoint provisions dedicated, always-on EC2 instances (often backed by GPUs for large language models like Llama 3) that load the model into memory and keep it there. Because the compute resources are entirely dedicated to a single model and always running, there are no "cold starts" or resource-sharing bottlenecks, guaranteeing the fastest possible millisecond-level response times for production traffic.
+
+### Why the Other Options Are Incorrect
+
+- **Multi-Model Endpoint (MME):** While MMEs are fantastic for cost savings (they allow you to host hundreds of models on a single endpoint), they achieve this by dynamically loading and unloading models from memory based on traffic. This introduces a "cold start" latency penalty if a requested model isn't currently in memory, which directly conflicts with the requirement to "minimize latency."
+    
+- **Asynchronous Endpoint:** Asynchronous endpoints are designed for payloads that take a long time to process (up to 15 minutes) or have massive payload sizes (up to 1 GB). They queue incoming requests and process them when resources are available. The queueing mechanism inherently adds latency, making it unsuitable for strict real-time, low-latency requirements.
+    
+- **Batch Transform Job:** This is an offline process used to run predictions on massive datasets stored in Amazon S3 all at once. It is not an endpoint at all, and it is entirely inappropriate for live, real-time application traffic.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding model deployment and SageMaker endpoints on the exam, use these mappings:
+
+- _"Minimal latency" / "High throughput" / "Millisecond responses"_ ➔ **Standard Real-Time Endpoint**
+    
+- _"Save money hosting many models" / "Infrequently used models"_ ➔ **Multi-Model Endpoint (MME)**
+    
+- _"Large payloads (up to 1GB)" / "Long inference times (up to 15 mins)"_ ➔ **Asynchronous Endpoint**
+    
+- _"Offline predictions" / "Process massive S3 datasets at once"_ ➔ **Batch Transform**
+
+____________
+A company is fine-tuning a large proprietary model on Amazon SageMaker using a large dataset. They want to minimize the time required for training while maximizing the utilization of their provisioned GPU instances. Which distributed training technique should the developer implement? 
+
+Model Parallelism 
+
+Data Parallelism 
+
+Tensor Parallelism 
+
+Pipeline Parallelism 
+
+The correct answer is **Data Parallelism**.
+
+### Why This Is the Correct Solution
+
+In machine learning on AWS, **Data Parallelism** is the primary technique used to speed up training when working with a **large dataset**.
+
+Under Data Parallelism, a complete copy of the model is loaded onto every single GPU in your Amazon SageMaker cluster. The massive dataset is then sharded (split up) into smaller chunks, and each GPU processes a different chunk simultaneously. Because every GPU is continuously working on its own batch of data and computing gradients at the same time, this technique maximizes GPU utilization (leaving no GPUs sitting idle) and drastically minimizes the total wall-clock time required to process the large dataset.
+
+### Why the Other Options Are Incorrect
+
+- **Model Parallelism:** This technique is required when the model itself is _too large to fit into the memory of a single GPU_. It splits the model architecture across multiple GPUs. While necessary for massive models, it is generally less efficient than data parallelism for scaling dataset processing.
+    
+- **Pipeline Parallelism:** This is a specific type of Model Parallelism where layers of a model are split across GPUs sequentially. A major drawback of pipeline parallelism is the creation of "pipeline bubbles"—moments where GPUs are sitting idle waiting for the previous GPU to finish its calculation. This violates the requirement to "maximize the utilization" of the GPUs.
+    
+- **Tensor Parallelism:** This is another sub-type of Model Parallelism that splits specific matrix operations (tensors) across multiple GPUs. Like pipeline parallelism, it is used to solve memory constraints for massive models, not primarily for distributing a large dataset efficiently.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding distributed training on SageMaker, use these mappings:
+
+- _"Large dataset" / "Minimize training time" / "Maximize GPU utilization"_ ➔ **Data Parallelism** (Specifically SageMaker Distributed Data Parallel - SMDDP)
+    
+- _"Model is too large to fit in a single GPU's memory" / "Out of Memory (OOM) errors"_ ➔ **Model Parallelism** (Specifically SageMaker Distributed Model Parallel - SMP)
+    
+- _"Split model layers sequentially"_ ➔ **Pipeline Parallelism**
+    
+- _"Split matrix math/attention heads"_ ➔ **Tensor Parallelism**
+
+
+___________
+A GenAI application is experiencing inconsistent latency and rate-limiting during peak business hours due to high, sustained traffic to a core Foundation Model on Amazon Bedrock. The developer needs to secure a guaranteed, consistent inference capacity to meet the SLA. What is the most cost-effective and performance-enhancing option in Amazon Bedrock for this scenario? 
+
+Cache all model responses using Amazon ElastiCache. 
+
+Switch the application to use a different, less popular on-demand FM. 
+
+Implement a client-side exponential backoff and retry mechanism. 
+
+Purchase Provisioned Throughput for the Foundation Model. 
+
+The correct answer is **Purchase Provisioned Throughput for the Foundation Model.**
+
+### Why This Is the Correct Solution
+
+When a Generative AI application experiences high, sustained traffic and faces rate-limiting or latency spikes on on-demand models, Amazon Bedrock **Provisioned Throughput** is the architectural solution designed to solve this.
+
+Provisioned Throughput allows you to purchase a specific amount of model units (throughput commitments) for a given Foundation Model for a term commitment (e.g., 1-month or 1-year). By doing this, you reserve dedicated model capacity, ensuring predictable, low-latency performance and completely eliminating on-demand throttling or rate-limiting during peak business hours to meet strict SLAs.
+
+### Why the Other Options Are Incorrect
+
+- **Cache all model responses using Amazon ElastiCache:** While caching can reduce redundant calls for identical or near-identical prompts, Generative AI applications typically handle dynamic, unique user queries. Caching does not provide "guaranteed, consistent inference capacity" for unique requests and won't prevent rate-limiting when unique traffic surges.
+    
+- **Implement a client-side exponential backoff and retry mechanism:** Exponential backoff is a great pattern for handling _transient_ errors or sudden, brief spikes. However, under high, _sustained_ traffic during peak hours, retries will only add to the traffic congestion, increase latency, and eventually fail once rate limits are continuously breached. It does not provide guaranteed capacity.
+    
+- **Switch the application to use a different, less popular on-demand FM:** Changing the core foundation model arbitrarily just to bypass traffic limits compromises the quality, capabilities, and consistency of the application's AI responses.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding capacity, SLAs, or traffic scaling on the exam, use these mappings:
+
+- _"Guaranteed capacity" / "Meet strict SLAs" / "Avoid rate-limiting under high sustained traffic"_ ➔ **Purchase Provisioned Throughput**
+    
+- _"Handle transient throttling / brief API errors"_ ➔ **Exponential backoff and retry mechanism**
+    
+- _"Reduce redundant LLM calls / static responses"_ ➔ **Caching (e.g., Amazon ElastiCache or Amazon DynamoDB)**
+
+___________
+A GenAI application is built using Amazon Bedrock, and the development team is looking to manage their costs by ensuring they only pay for the capacity they use, even during periods of high, unpredictable traffic spikes. Which Bedrock deployment option should they select for the Foundation Model inference? 
+
+Provisioned Throughput 
+
+Dedicated Cluster Inference 
+
+Hybrid Deployment 
+
+On-Demand Throughput 
+
+The correct answer is **On-Demand Throughput**.
+
+### Why This Is the Correct Solution
+
+When a team wants to strictly "pay for the capacity they use" (pay-as-you-go) and must handle "unpredictable traffic spikes" without over-committing to expensive, always-on resources, **On-Demand Throughput** is the correct inference pricing model in Amazon Bedrock.
+
+With On-Demand inference, you are billed exclusively for the exact number of input tokens processed and output tokens generated. There are no upfront commitments, no hourly minimums, and no wasted capacity during periods of low traffic. Furthermore, On-Demand inference inherently handles unpredictable traffic spikes across AWS's shared multi-tenant infrastructure (though subject to standard AWS service quotas).
+
+### Why the Other Options Are Incorrect
+
+- **Provisioned Throughput:** This is the opposite of the requirement. Provisioned Throughput reserves dedicated model units and bills you at a fixed hourly rate _regardless of whether you actually use the capacity_. It is designed for steady, predictable, high-volume workloads where guaranteed latency is required, not for unpredictable spikes where you want to minimize costs.
+    
+- **Dedicated Cluster Inference:** This is a fabricated term in the context of Amazon Bedrock. While you can provision dedicated clusters for things like Amazon OpenSearch or Amazon Redshift, Bedrock inference is categorized into On-Demand, Batch, and Provisioned Throughput.
+    
+- **Hybrid Deployment:** This is a general cloud computing term for combining on-premises infrastructure with the public cloud. It is not a deployment or billing option for Foundation Models on Amazon Bedrock.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding Bedrock inference pricing on the exam, use these mappings:
+
+- _"Pay only for what you use" / "Unpredictable spikes" / "No upfront commitments"_ ➔ **On-Demand Throughput**
+    
+- _"Guaranteed capacity" / "Consistent high-volume traffic" / "Meet strict latency SLAs"_ ➔ **Provisioned Throughput**
+    
+- _"Offline processing" / "Not time-sensitive" / "Lowest cost per token"_ ➔ **Batch Inference**
+
+________
+To comply with regulatory requirements, an organization must track the transformation and origin of all data used for fine-tuning Foundation Models on Amazon Bedrock. Which AWS service is specifically designed to provide a centralized view of data lineage and governance across the data pipeline? 
+
+AWS CloudTrail 
+
+AWS Glue Data Catalog with Lineage 
+
+Amazon SageMaker Model Cards 
+
+Amazon S3 versioning 
+
+The correct answer is **AWS Glue Data Catalog with Lineage**.
+
+### Why This Is the Correct Solution
+
+To meet strict regulatory and compliance requirements for AI workloads, organizations must prove they know exactly where their training data came from and how it was modified.
+
+The **AWS Glue Data Catalog** serves as a centralized, persistent metadata store for your entire data landscape. When combined with its **Data Lineage** capabilities (often powered by OpenLineage or integrated via Amazon DataZone), it tracks and visualizes the complete journey of data assets. This allows data engineers and compliance officers to see the exact origin of the raw data in Amazon S3, track every ETL (Extract, Transform, Load) transformation step applied to it, and verify the final structured dataset that was ultimately fed into Amazon Bedrock for model fine-tuning.
+
+### Why the Other Options Are Incorrect
+
+- **Amazon SageMaker Model Cards:** While this is a highly important Generative AI governance tool, it is used to document the _model itself_ (e.g., intended use cases, risk ratings, performance metrics, and ethical considerations). It is not designed to map complex data engineering pipelines and row/column-level dataset transformations.
+    
+- **AWS CloudTrail:** This is a security and audit service that logs AWS API calls (e.g., "Who called the `InvokeModel` API at 3:00 PM?"). It does not track the content of the data, schema changes, or how data is transformed as it moves through a pipeline.
+    
+- **Amazon S3 versioning:** This is a storage feature that retains multiple variants of an object in the same bucket to protect against accidental overwrites or deletions. It is a backup and recovery mechanism, not a data governance or lineage tracking tool.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding data tracking, compliance, or ML governance on the exam, use these mappings:
+
+- _"Track data origin and transformation" / "Data pipeline visibility"_ ➔ **AWS Glue Data Catalog with Lineage / Amazon DataZone**
+    
+- _"Centralized metadata repository for data lakes"_ ➔ **AWS Glue Data Catalog**
+    
+- _"Document model intended use, risk, and evaluation metrics"_ ➔ **Amazon SageMaker Model Cards**
+    
+- _"Track model training parameters, hyperparameters, and artifacts"_ ➔ **Amazon SageMaker ML Lineage Tracking**
+
+______
+A RAG application must use a vector store based on Amazon Aurora PostgreSQL with the ′pgvector′ extension. To ensure high-performance similarity search for a large number of vectors, which indexing method should the developer choose for the ′pgvector′ column? 
+
+1. Hash index 
+
+2. IVF (Inverted File Index) or HNSW (Hierarchical Navigable Small World) index 
+
+3. Primary key index 
+
+4. B-tree index 
+
+The correct answer is **IVF (Inverted File Index) or HNSW (Hierarchical Navigable Small World) index**.
+
+### Why This Is the Correct Solution
+
+The `pgvector` extension for PostgreSQL is specifically designed for storing and querying high-dimensional vector embeddings generated by machine learning models. To achieve high-performance "similarity search" (finding vectors closest to a query vector) across massive datasets, you cannot use standard database indexes. Instead, `pgvector` relies on specialized Approximate Nearest Neighbor (ANN) index algorithms:
+
+1. **HNSW (Hierarchical Navigable Small World):** A graph-based index that provides the highest query performance and recall (accuracy). This is the AWS-recommended default choice for most RAG workloads on Amazon Aurora.
+    
+2. **IVFFlat (Inverted File with Flat Compression):** A clustering-based index that uses less memory and builds faster than HNSW, but has slightly lower search speeds and recall.
+    
+
+Both of these indexes allow the database to mathematically search a tiny, highly relevant fraction of the vectors rather than performing a brute-force sequential scan (K-Nearest Neighbors), dramatically reducing query latency to sub-second levels.
+
+### Why the Other Options Are Incorrect
+
+- **B-tree index:** This is the default PostgreSQL index used for standard, one-dimensional scalar data (like dates, numbers, or alphabetical strings) using exact sorting (greater than / less than). It cannot mathematically compute distance operations (like cosine similarity) across multi-dimensional vectors.
+    
+- **Hash index:** Used exclusively for exact equality matches (e.g., `WHERE status = 'ACTIVE'`). Similarity search in RAG is about finding the _closest_ mathematical approximations, not exact string or number matches.
+    
+- **Primary key index:** A primary key is simply a B-tree index that also enforces a unique constraint on an identifier column (like a UUID or an integer). It cannot be used to perform vector similarity searches.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding vector databases and PostgreSQL on the exam, use these mappings:
+
+- _"High-performance vector search in PostgreSQL / Aurora"_ ➔ **pgvector extension**
+    
+- _"Best performance/recall pgvector index"_ ➔ **HNSW (Hierarchical Navigable Small World)**
+    
+- _"Lower memory / faster build pgvector index"_ ➔ **IVFFlat**
+    
+- _"pgvector search metrics"_ ➔ **Cosine similarity, L2 distance (Euclidean), or Inner product**
+____
+When performing fine-tuning on Amazon SageMaker, a developer is interested in tracking the model‘s accuracy, loss, and F1 score in real-time. Which SageMaker feature allows the developer to define and monitor these custom metrics directly from the training job logs? 
+
+Amazon SageMaker Model Registry 
+
+Amazon SageMaker Training Metrics 
+
+Amazon SageMaker Model Monitor 
+
+Amazon SageMaker Debugger 
+
+The correct answer is **Amazon SageMaker Training Metrics**.
+
+### Why This Is the Correct Solution
+
+When you run a training or fine-tuning job using a custom algorithm or framework on Amazon SageMaker, the training script typically outputs continuous text (like loss values, accuracy, or F1 scores) to the console's standard output (`stdout` and `stderr`).
+
+**Amazon SageMaker Training Metrics** allows you to define custom **Metric Definitions** using Regular Expressions (Regex). SageMaker automatically scans the training job's real-time logs, parses the text using your Regex patterns to extract those specific metric values, and streams them directly into **Amazon CloudWatch** as time-series metrics. This allows developers to instantly visualize and monitor how well the model is learning in real-time on a CloudWatch dashboard without writing custom logging infrastructure.
+
+### Why the Other Options Are Incorrect
+
+- **Amazon SageMaker Debugger:** While Debugger is used during training, it works by attaching framework-level hooks to the ML code to capture internal tensor data, find bottlenecks, and detect complex ML issues (like vanishing gradients or overfitting). It does _not_ parse custom textual metrics directly from standard training job logs using regex.
+    
+- **Amazon SageMaker Model Monitor:** This service is used _after_ a model is trained and deployed to a real-time production endpoint. It monitors the live inference traffic to detect data drift, concept drift, or model quality degradation over time. It is not used during the training phase.
+    
+- **Amazon SageMaker Model Registry:** This is a metadata catalog used for tracking model versions, managing approval workflows, and deploying models through CI/CD pipelines. It stores the final artifacts of a training job, not live, real-time training metrics.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding monitoring ML training on the exam, use these mappings:
+
+- _"Parse custom metrics from training job logs" / "Regex metric definitions"_ ➔ **Amazon SageMaker Training Metrics (streamed to CloudWatch)**
+    
+- _"Monitor deployed models for data drift, concept drift, or bias"_ ➔ **Amazon SageMaker Model Monitor**
+    
+- _"Detect vanishing gradients, tensor issues, or profile GPU/CPU bottlenecks during training"_ ➔ **Amazon SageMaker Debugger**
+    
+- _"Catalog model versions and manage deployment approvals"_ ➔ **Amazon SageMaker Model Registry**
+___________
+A company is designing a new Generative AI solution on Bedrock that handles highly sensitive and regulated data. The architecture must ensure that no intermediate conversational state data (e.g., memory, conversation history) is ever written to disk or persistent storage. Which architectural pattern should the developer choose for managing the conversation context? 
+
+Pass the full, uncompressed conversation history as part of every prompt (Context Window as Memory). 
+
+Use an Amazon S3 bucket with a short lifecycle policy for state storage. 
+
+Implement a custom, in-memory cache using Amazon ElastiCache for Redis. 
+
+Store the entire conversation history in an encrypted Amazon DynamoDB table. 
+
+The correct answer is **Pass the full, uncompressed conversation history as part of every prompt (Context Window as Memory).**
+
+### Why This Is the Correct Solution
+
+To meet the strict regulatory requirement of zero persistent storage, the architecture must be completely **stateless** on the backend.
+
+Amazon Bedrock's API is inherently stateless; it does not automatically remember past interactions. By relying on the "Context Window as Memory" pattern, the client application holds the conversation history in its local session memory and passes the entire context back to the model within the prompt payload on every single API call.
+
+The foundation model processes the prompt in memory, generates a response, and immediately discards the data. Because the state is managed entirely within the transient API payload rather than stored in a backend database, no conversation data is ever written to disk or persistent cloud infrastructure. This perfectly satisfies the strictest data residency and ephemeral data requirements.
+
+### Why the Other Options Are Incorrect
+
+- **Store the entire conversation history in an encrypted Amazon DynamoDB table:** Amazon DynamoDB is a persistent NoSQL database. Even if the data is encrypted at rest, it is physically written to solid-state drives (SSDs), directly violating the requirement that data never be written to disk.
+    
+- **Use an Amazon S3 bucket with a short lifecycle policy for state storage:** Amazon S3 is a persistent object storage service. A lifecycle policy might automatically delete the data after 24 hours, but the data is still written to physical disk storage in the interim.
+    
+- **Implement a custom, in-memory cache using Amazon ElastiCache for Redis:** While ElastiCache is primarily an in-memory data store, Redis typically employs disk-backed persistence mechanisms (like RDB snapshots or AOF logs) by default to prevent data loss during reboots. Even if configured to be strictly in-memory, introducing a dedicated, centralized stateful infrastructure tier drastically increases the compliance audit scope and security footprint compared to a purely stateless, payload-driven architecture.
+    
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding conversation memory, state management, or compliance on the exam, use these mappings:
+
+- _"Zero persistent storage" / "Stateless architecture" / "Strict data privacy"_ ➔ **Pass conversation history in the prompt (Context Window as Memory)**
+    
+- _"Retain conversation across multiple sessions/days" / "Durable memory"_ ➔ **Amazon DynamoDB** (Highly scalable, serverless persistent storage).
+    
+- _"Low-latency external state management across distributed clients"_ ➔ **Amazon ElastiCache for Redis**
+    
+- _"Model forgets early details of a long conversation"_ ➔ **Context Window Limit exceeded** (Requires periodic summarization or vector storage instead of passing the full history)
+________

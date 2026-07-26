@@ -241,3 +241,124 @@ Key Solutions: <mark style="background:#d3f8b6">CloudWatch Anomaly Detection, Ma
 
 
 -------------------
+### 🧠 Model Optimization & Edge Deployment
+
+- _"Edge devices" / "No internet connection" / "Local inference"_ ➔ **Deploy optimized Small Language Models (SLMs)**
+    
+- _"Zero network latency" / "Real-time edge processing"_ ➔ **On-device inference (Avoid centralized APIs)**
+    
+- _"Reduce model size" / "Run on smaller GPUs" / "Faster inference"_ ➔ **Quantization**
+    
+- _"Trade-off for quantization"_ ➔ **Slight loss of accuracy/quality**
+    
+- _"Fine-tune a quantized model"_ ➔ **QLoRA**
+    
+- _"Host multiple fine-tuned models cheaply" / "Multi-adapter serving"_ ➔ **Deploy one base model and dynamically load different PEFT/LoRA adapters.**
+    
+- _"PEFT output"_ ➔ **Adapter weights** (significantly smaller than the base model).
+    
+
+### 🔍 RAG, Vector Databases, & Search
+
+- _"Scalable vector database" / "k-NN search" / "Store embeddings"_ ➔ **Amazon OpenSearch Service (or Serverless Vector Engine)**
+    
+- _"Bedrock Knowledge Bases default backend"_ ➔ **Amazon OpenSearch Serverless**
+    
+- _"Relational database for vectors" / "Existing SQL workloads"_ ➔ **Amazon Aurora PostgreSQL (with pgvector)**
+    
+- _"Graph relationships between entities"_ ➔ **Amazon Neptune**
+    
+- _"Best relevance" / "Combine semantic meaning with exact keyword/metadata"_ ➔ **Hybrid Search**
+    
+- _"Understand intent, context, or synonyms"_ ➔ **Vector Search / Semantic Search**
+    
+- _"Exact matches for part numbers, SKUs, or IDs"_ ➔ **Lexical Search (BM25) / Metadata Filtering**
+    
+- _"Improve RAG retrieval accuracy" / "Cross-encoder"_ ➔ **Re-ranking** _(Note: Increases compute cost and latency)._
+    
+- _"Show user where the answer came from" / "Source attribution" / "Grounding"_ ➔ **Use the `citations` object returned by the `RetrieveAndGenerate` API.**
+    
+- _"Need to fetch documents without generating an answer"_ ➔ **Use the `Retrieve` API.**
+    
+- _"Most efficient data synchronization" / "Real-time updates"_ ➔ **Event-driven architectures (Amazon S3 Event Notifications or Amazon EventBridge).**
+    
+- _"Minimize embedding costs for vector stores"_ ➔ **Incremental updates** _(Process only new/changed files, never do full rebuilds)._
+    
+- _"Automating Bedrock Knowledge Base syncs"_ ➔ **Use EventBridge to trigger a Lambda function that calls the `StartIngestionJob` API.**
+    
+
+### 🤖 Amazon Bedrock & Agents
+
+- _"How do Bedrock Agents know what APIs exist?"_ ➔ **OpenAPI schemas** (JSON/YAML definitions of REST APIs).
+    
+- _"Where does the business logic execute for an Action Group?"_ ➔ **AWS Lambda** (or by returning control to the client application).
+    
+- _"Legacy API / Custom Protocol integration"_ ➔ **Use AWS Lambda as a wrapper/adapter** to translate the REST request into the required format.
+    
+- _"Agent stuck in infinite loop" / "Endless Thought and Action"_ ➔ **Misaligned tool descriptions/schemas or bad API outputs.**
+    
+- _"Agent hallucinates tool inputs" / "Fails to call tool correctly"_ ➔ **Temperature is too high, or the OpenAPI schema descriptions are too vague.**
+    
+- _"Agent fails immediately with a canned response"_ ➔ **Bedrock Guardrails intervened.**
+    
+- _"Process text and image together" / "Analyze visual data"_ ➔ **Multimodal Foundation Model** (e.g., Claude 3, Amazon Titan Multimodal).
+    
+- _"Standard API to send a prompt to Bedrock"_ ➔ **`InvokeModel`** (or the newer `Converse` API).
+    
+- _"How are images passed to Bedrock multimodal models?"_ ➔ **Base64 encoded strings** _(Passed within the JSON payload, not uploaded as raw files)._
+    
+
+### 📊 Model Training & SageMaker
+
+- _"Teach the model how to respond" / "Supervised Fine-Tuning (SFT)"_ ➔ **Prompt-completion pairs (.jsonl)**
+    
+- _"Teach the model new vocabulary or domain knowledge" / "Unlabeled data"_ ➔ **Continued Pre-training** _(Only requires `prompt` fields)._
+    
+- _"Where is training data stored for Bedrock fine-tuning?"_ ➔ **Amazon S3**
+    
+- _"Where are model artifacts stored for SageMaker?"_ ➔ **Amazon S3** (Never DynamoDB, EBS, or EFS).
+    
+- _"Perfect on training, fails on test" / "Fails to generalize"_ ➔ **Overfitting (High Variance)**
+    
+- _"Poor performance on both training and test"_ ➔ **Underfitting (High Bias)**
+    
+- _"Model used future data during training" / "Target variable included in features"_ ➔ **Data Leakage**
+    
+- _"Methods to fix overfitting"_ ➔ **More data, early stopping, dropout, L1/L2 regularization**
+    
+- _"Pre-processing + inference on same instance" / "Avoid double costs"_ ➔ **SageMaker Inference Pipelines** or **Custom Container / inference.py script**.
+    
+- _"Custom model" / "Specialized model" / "Sub-second ML inference"_ ➔ **Amazon SageMaker Real-time Endpoints**
+    
+- _"Pre-processing massive datasets before training"_ ➔ **Amazon SageMaker Processing** or **Amazon EMR** _(for batch, not real-time)._
+    
+- _"Need GPU for quick, bursty serverless tasks"_ ➔ **Trick question.** Lambda does not support GPUs.
+    
+
+### 🛡️ Security, Compliance, & Prompt Engineering
+
+- _"User overrides instructions" / "Ignore previous commands"_ ➔ **Prompt Injection**
+    
+- _"Prevent prompt injection natively via prompt engineering"_ ➔ **Use a System Prompt, XML tags, or strict delimiters.**
+    
+- _"Prevent prompt injection at the architectural level"_ ➔ **Amazon Bedrock Guardrails** _(Uses "Prompt Attack" filters)._
+    
+- _"Filter PII, toxic words, or block prompt injection attacks"_ ➔ **Amazon Bedrock Guardrails**
+    
+- _"Least privilege IAM for Agents" / "Restrict what the agent can execute"_ ➔ **Limiting the blast radius**
+    
+- _"Agent autonomously executing APIs"_ ➔ **Action Groups**
+    
+- _"Encryption at rest in Bedrock"_ ➔ **AWS KMS** _(Customer Managed Keys (CMK) provide full control)._
+    
+- _"Encryption in transit"_ ➔ **TLS/SSL (HTTPS)**
+    
+- _"Audit API activity"_ ➔ **AWS CloudTrail**
+    
+- _"Discover PII/sensitive data in S3"_ ➔ **Amazon Macie**
+    
+- _"Data residency" / "Sovereignty" / "Must not leave the country"_ ➔ **Deploy in the specific AWS Region**
+    
+- _"Where is Bedrock data stored/processed?"_ ➔ **It remains in the region where the API call was made.**
+    
+- _"Cross-region inference"_ ➔ **An opt-in Bedrock feature** _(Should not be used if strict single-region data residency is required)._

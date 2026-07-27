@@ -2643,22 +2643,22 @@ Both of these indexes allow the database to mathematically search a tiny, highly
 ### Why the Other Options Are Incorrect
 
 - **B-tree index:** This is the default PostgreSQL index used for standard, one-dimensional scalar data (like dates, numbers, or alphabetical strings) using exact sorting (greater than / less than). It cannot mathematically compute distance operations (like cosine similarity) across multi-dimensional vectors.
-    
+
 - **Hash index:** Used exclusively for exact equality matches (e.g., `WHERE status = 'ACTIVE'`). Similarity search in RAG is about finding the _closest_ mathematical approximations, not exact string or number matches.
-    
+
 - **Primary key index:** A primary key is simply a B-tree index that also enforces a unique constraint on an identifier column (like a UUID or an integer). It cannot be used to perform vector similarity searches.
-    
+
 
 ### 🔑 AIP-C01 Exam Keywords to Remember
 
 When you see questions regarding vector databases and PostgreSQL on the exam, use these mappings:
 
 - _"High-performance vector search in PostgreSQL / Aurora"_ ➔ **pgvector extension**
-    
+
 - _"Best performance/recall pgvector index"_ ➔ **HNSW (Hierarchical Navigable Small World)**
-    
+
 - _"Lower memory / faster build pgvector index"_ ➔ **IVFFlat**
-    
+
 - _"pgvector search metrics"_ ➔ **Cosine similarity, L2 distance (Euclidean), or Inner product**
 ____
 When performing fine-tuning on Amazon SageMaker, a developer is interested in tracking the model‘s accuracy, loss, and F1 score in real-time. Which SageMaker feature allows the developer to define and monitor these custom metrics directly from the training job logs? 
@@ -2682,22 +2682,22 @@ When you run a training or fine-tuning job using a custom algorithm or framework
 ### Why the Other Options Are Incorrect
 
 - **Amazon SageMaker Debugger:** While Debugger is used during training, it works by attaching framework-level hooks to the ML code to capture internal tensor data, find bottlenecks, and detect complex ML issues (like vanishing gradients or overfitting). It does _not_ parse custom textual metrics directly from standard training job logs using regex.
-    
+
 - **Amazon SageMaker Model Monitor:** This service is used _after_ a model is trained and deployed to a real-time production endpoint. It monitors the live inference traffic to detect data drift, concept drift, or model quality degradation over time. It is not used during the training phase.
-    
+
 - **Amazon SageMaker Model Registry:** This is a metadata catalog used for tracking model versions, managing approval workflows, and deploying models through CI/CD pipelines. It stores the final artifacts of a training job, not live, real-time training metrics.
-    
+
 
 ### 🔑 AIP-C01 Exam Keywords to Remember
 
 When you see questions regarding monitoring ML training on the exam, use these mappings:
 
 - _"Parse custom metrics from training job logs" / "Regex metric definitions"_ ➔ **Amazon SageMaker Training Metrics (streamed to CloudWatch)**
-    
+
 - _"Monitor deployed models for data drift, concept drift, or bias"_ ➔ **Amazon SageMaker Model Monitor**
-    
+
 - _"Detect vanishing gradients, tensor issues, or profile GPU/CPU bottlenecks during training"_ ➔ **Amazon SageMaker Debugger**
-    
+
 - _"Catalog model versions and manage deployment approvals"_ ➔ **Amazon SageMaker Model Registry**
 ___________
 A company is designing a new Generative AI solution on Bedrock that handles highly sensitive and regulated data. The architecture must ensure that no intermediate conversational state data (e.g., memory, conversation history) is ever written to disk or persistent storage. Which architectural pattern should the developer choose for managing the conversation context? 
@@ -2723,21 +2723,287 @@ The foundation model processes the prompt in memory, generates a response, and i
 ### Why the Other Options Are Incorrect
 
 - **Store the entire conversation history in an encrypted Amazon DynamoDB table:** Amazon DynamoDB is a persistent NoSQL database. Even if the data is encrypted at rest, it is physically written to solid-state drives (SSDs), directly violating the requirement that data never be written to disk.
-    
+
 - **Use an Amazon S3 bucket with a short lifecycle policy for state storage:** Amazon S3 is a persistent object storage service. A lifecycle policy might automatically delete the data after 24 hours, but the data is still written to physical disk storage in the interim.
-    
+
 - **Implement a custom, in-memory cache using Amazon ElastiCache for Redis:** While ElastiCache is primarily an in-memory data store, Redis typically employs disk-backed persistence mechanisms (like RDB snapshots or AOF logs) by default to prevent data loss during reboots. Even if configured to be strictly in-memory, introducing a dedicated, centralized stateful infrastructure tier drastically increases the compliance audit scope and security footprint compared to a purely stateless, payload-driven architecture.
-    
+
 
 ### 🔑 AIP-C01 Exam Keywords to Remember
 
 When you see questions regarding conversation memory, state management, or compliance on the exam, use these mappings:
 
 - _"Zero persistent storage" / "Stateless architecture" / "Strict data privacy"_ ➔ **Pass conversation history in the prompt (Context Window as Memory)**
-    
+
 - _"Retain conversation across multiple sessions/days" / "Durable memory"_ ➔ **Amazon DynamoDB** (Highly scalable, serverless persistent storage).
-    
+
 - _"Low-latency external state management across distributed clients"_ ➔ **Amazon ElastiCache for Redis**
-    
+
 - _"Model forgets early details of a long conversation"_ ➔ **Context Window Limit exceeded** (Requires periodic summarization or vector storage instead of passing the full history)
 ________
+A developer is setting up an Amazon Bedrock Knowledge Base and needs to ensure that only the Bedrock service can assume the necessary IAM role to access the private S3 buckets containing the source documents. Which component of the IAM role should be configured to restrict who can assume the role? 
+
+The Permissions boundary 
+
+The Resource policy 
+
+The Access control list (ACL) 
+
+The Trust policy 
+
+The correct answer is **The Trust policy**.
+
+### Why This Is the Correct Solution
+
+In AWS Identity and Access Management (IAM), every role is comprised of two distinct types of policies:
+
+1. **Permissions policies:** These dictate what the role _can do_ once it is assumed (e.g., read files from an S3 bucket).
+
+2. **Trust policies:** These dictate _who or what_ is allowed to assume the role in the first place.
+
+
+To ensure that only Amazon Bedrock can assume the role to access your private S3 documents, you must configure the role's Trust policy (also known as the assume role policy) to explicitly list the Bedrock service principal (`bedrock.amazonaws.com`) as the trusted entity. You can further secure this using the `aws:SourceAccount` and `aws:SourceArn` condition keys to ensure Bedrock can only assume the role on behalf of your specific Knowledge Base, preventing the "confused deputy" problem.
+
+### Why the Other Options Are Incorrect
+
+- **The Permissions boundary:** A permissions boundary is an advanced IAM feature that sets the _maximum_ permissions a role can have, regardless of its permissions policies. It does not dictate who is allowed to assume the role.
+
+- **The Resource policy:** A resource policy is attached directly to an AWS resource (like an S3 Bucket Policy or a KMS Key Policy) to grant or deny access to that specific resource. While you could use an S3 Bucket Policy to restrict access, the question specifically asks which component of the _IAM role_ controls assumption.
+
+- **The Access control list (ACL):** ACLs are a legacy access control mechanism used in Amazon S3 to grant basic read/write permissions to other AWS accounts. They are entirely unrelated to IAM role assumption and are generally recommended to be disabled in modern AWS architectures.
+
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding IAM roles, permissions, and security delegations on the exam, use these mappings:
+
+- _"Who can assume the role?" / "Allow a service to act on your behalf"_ ➔ **Trust policy (AssumeRole policy)**
+
+- _"What can the role do once assumed?"_ ➔ **Permissions policy**
+
+- _"Prevent the confused deputy problem in Bedrock"_ ➔ **Use `aws:SourceArn` and `aws:SourceAccount` in the Trust policy**
+
+- _"Set maximum allowed permissions for developers creating roles"_ ➔ **Permissions boundary**
+
+______
+In a highly available Generative AI application architecture using Amazon Bedrock, how should the developer implement a failover mechanism if the primary Foundation Model (FM) endpoint becomes unavailable or starts returning consistent error codes? 
+
+Use AWS Config to monitor the model‘s health and trigger an alarm. 
+
+Use Amazon EventBridge to route the traffic to a new model. 
+
+Implement a complex exponential backoff and retry loop on the same model ID. 
+
+Implement a Circuit Breaker pattern within the application logic to automatically switch to a pre-defined secondary model ID. 
+
+The correct answer is **Implement a Circuit Breaker pattern within the application logic to automatically switch to a pre-defined secondary model ID.**
+
+### Why This Is the Correct Solution
+
+When building high-availability (HA) applications on top of Amazon Bedrock, relying on a single Foundation Model creates a single point of failure. If that specific model experiences a service degradation, outage, or prolonged rate-limiting in a region, synchronous requests will fail.
+
+The **Circuit Breaker pattern** is the industry-standard software resilience pattern for this scenario:
+
+1. **Normal Operation (Closed State):** Traffic routes normally to the primary model (e.g., Anthropic Claude 3.5 Sonnet).
+
+2. **Threshold Exceeded (Open State):** If the application detects a threshold of consecutive `5xx` server errors or timeouts within a time window, the circuit "trips."
+
+3. **Fallback Execution:** The application automatically routes subsequent requests to a pre-configured secondary fallback model (e.g., Anthropic Claude 3 Haiku or Amazon Nova Micro) or a secondary AWS Region.
+
+
+This prevents cascading application failures and ensures end users experience continuous service even during upstream model disruptions.
+
+### Why the Other Options Are Incorrect
+
+- **Use AWS Config to monitor the model's health and trigger an alarm:** AWS Config is an inventory and compliance service that tracks _configuration changes_ to AWS resources over time (e.g., S3 bucket policy changes). It does not monitor real-time API health, response latencies, or application-level HTTP error rates.
+
+- **Use Amazon EventBridge to route the traffic to a new model:** Amazon EventBridge is an event bus for asynchronous, event-driven architectures. It cannot intercept, inspect, or dynamically re-route synchronous API calls (like `InvokeModel` or `Converse`) in real time between an application and Bedrock.
+
+- **Implement a complex exponential backoff and retry loop on the same model ID:** While exponential backoff is essential for handling _transient_ errors (like momentary network blips), continuously retrying the _same_ model during a major service outage or persistent failure will exhaust request timeout budgets, increase application latency, and repeatedly fail for the user.
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding high availability, resilience, and fault tolerance in Bedrock on the exam, look for these mappings:
+
+- _"Model outage / Endpoint failure / High Availability"_ ➔ **Circuit Breaker pattern with a fallback model ID** (or **Bedrock Cross-Region Inference**)
+
+- _"Transient throttling / Brief 429 Too Many Requests"_ ➔ **Exponential backoff and jitter retry loop**
+
+- _"Automatic load distribution across AWS regions"_ ➔ **Bedrock Cross-Region Inference / Inference Profiles**
+_________
+A developer is fine-tuning a Foundation Model on Amazon Bedrock to specialize it for a specific industry domain. To minimize training time, reduce costs, and avoid catastrophic forgetting of the base model‘s knowledge, which fine-tuning technique is the recommended best practice? 
+
+Zero-shot learning 
+
+Low-Rank Adaptation (LoRA) 
+
+Full-parameter fine-tuning 
+
+Few-shot in-context learning 
+
+The correct answer is **Low-Rank Adaptation (LoRA)**.
+
+### Why This Is the Correct Solution
+
+**Low-Rank Adaptation (LoRA)** is the industry-standard **Parameter-Efficient Fine-Tuning (PEFT)** technique used by Amazon Bedrock for model customization.
+
+Instead of updating all the billions of parameters in a Foundation Model, LoRA "freezes" the original base model weights and injects a tiny amount of new, trainable weights (known as adapter layers) into the architecture.
+
+Because you are only training a fraction of a percent of the model's total parameters, the process requires significantly less GPU compute, slashes training time, and drastically reduces costs. Furthermore, because the original base model weights remain completely untouched and frozen, the model retains all of its general knowledge, completely preventing **catastrophic forgetting** (a phenomenon where a model forgets how to do basic tasks after being fine-tuned on a narrow dataset).
+
+### Why the Other Options Are Incorrect
+
+- **Full-parameter fine-tuning:** This technique updates _every single weight_ in the model. It is massively expensive, requires massive GPU clusters, takes a long time, and carries a very high risk of catastrophic forgetting because you are overwriting the model's original foundational knowledge.
+
+- **Few-shot in-context learning:** This is a _prompt engineering_ technique, not a fine-tuning technique. It involves providing a few examples of the desired output inside the prompt itself at inference time. It does not update the model's underlying weights or permanently teach it a specific industry domain.
+
+- **Zero-shot learning:** Similar to few-shot, this is simply sending a prompt to the model without any examples and relying on its base training. It involves no model training or customization.
+
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding fine-tuning models on the exam, use these mappings:
+
+- _"Minimize training cost and time" / "Avoid catastrophic forgetting"_ ➔ **Parameter-Efficient Fine-Tuning (PEFT) / LoRA**
+
+- _"Provide examples in the prompt at runtime"_ ➔ **Few-shot in-context learning**
+
+- _"Model forgets its original general knowledge after training"_ ➔ **Catastrophic Forgetting**
+
+- _"Train every single weight in a model"_ ➔ **Full-parameter fine-tuning** (Rarely the right answer for cost/time optimization).
+_____
+A company is using Amazon Bedrock to run a mission-critical application with extremely high traffic. They need to ensure that the application maintains consistent, guaranteed performance and latency, even when demand for the Foundation Model service is high. Which configuration should the developer choose?
+
+- Serverless Inference
+- Provisioned Throughput
+- A multi-model endpoint with automatic traffic shifting.
+- On-Demand Throughput with aggressive retries
+- 
+The correct answer is **Provisioned Throughput**.
+
+### Why This Is the Correct Solution
+
+For mission-critical applications that require guaranteed availability, consistent latency, and the ability to handle massive traffic without being throttled, Amazon Bedrock offers **Provisioned Throughput**.
+
+By purchasing Provisioned Throughput, you are reserving dedicated compute capacity (measured in Model Units) exclusively for your workload for a fixed term (e.g., 1 month or 6 months). Because this infrastructure is partitioned entirely for your account, you bypass the shared multi-tenant On-Demand queue. This completely eliminates the risk of "Too Many Requests" (429) errors or latency spikes caused by other AWS customers driving up demand on the service.
+
+### Why the Other Options Are Incorrect
+
+- **On-Demand Throughput with aggressive retries:** On-Demand capacity is a shared, pay-as-you-go pool. During extreme traffic spikes or regional high demand, On-Demand requests are subject to strict API rate limiting and throttling. Implementing aggressive retries will only compound the latency issue and cause requests to timeout, directly failing the requirement for "consistent, guaranteed performance."
+
+- **A multi-model endpoint with automatic traffic shifting:** Multi-Model Endpoints (MMEs) are an Amazon SageMaker feature used to host hundreds of custom models on a single EC2 instance to save money. This is not a capacity or pricing configuration within Amazon Bedrock.
+
+- **Serverless Inference:** While Amazon Bedrock as a service is fully managed and "serverless" (you don't manage infrastructure), this is a generic buzzword in this context. The specific billing and capacity configuration required to guarantee performance is Provisioned Throughput.
+
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding capacity planning and performance guarantees on the exam, use these mappings:
+
+- _"Consistent, guaranteed performance" / "Meet strict SLAs" / "Mission-critical high traffic"_ ➔ **Provisioned Throughput**
+
+- _"Pay only for what you use" / "Unpredictable traffic" / "No upfront commitment"_ ➔ **On-Demand Throughput**
+
+- _"Avoid rate limiting (429 errors) under sustained high load"_ ➔ **Provisioned Throughput**
+
+__________
+## Quick Comparison
+
+|Feature|On-Demand (with Retries)|Provisioned Throughput|
+|---|---|---|
+|**Pricing Model**|Pay-as-you-go (per 1,000 tokens / per image).|Fixed hourly rate per Model Unit (1-6 month terms).|
+|**Capacity**|Shared multi-tenant pool.|Dedicated, private compute capacity.|
+|**Throttling Risk**|High during regional traffic spikes (`429` errors).|Zero (up to your provisioned limit).|
+|**Best For**|Spiky, unpredictable, or low-volume workloads.|Mission-critical, high-volume, steady workloads.|
+
+
+
+__------
+A Bedrock-based application is frequently asked the same complex, factual questions, leading to high cost and latency for repetitive queries. Which operational efficiency technique should the developer implement to save costs and reduce latency for these idempotent requests? 
+
+Switch to a cheaper on-demand model for all requests. 
+
+Implement Provisioned Throughput. 
+
+Use Amazon ElastiCache or a similar caching layer for prompt-response pairs. 
+
+Use AWS Step Functions to manage retries. 
+
+The correct answer is **Use Amazon ElastiCache or a similar caching layer for prompt-response pairs.**
+
+### Why This Is the Correct Solution
+
+When an application frequently handles identical or idempotent queries, executing a full Foundation Model inference call every time wastes both money and time.
+
+By placing a caching layer (such as **Amazon ElastiCache for Redis** or **DynamoDB**) in front of Amazon Bedrock:
+
+1. The application checks the cache using a hash of the user's prompt.
+
+2. **On a Cache Hit (Repetitive Query):** The application immediately returns the pre-computed answer from memory in single-digit milliseconds without making an API call to Bedrock. This reduces model invocation costs to zero for that request.
+
+3. **On a Cache Miss (New Query):** The application routes the prompt to Bedrock, generates the response, stores the result in the cache, and returns it to the user.
+
+
+For frequent, complex, and static factual questions, caching provides the maximum possible cost savings and latency reduction.
+
+### Why the Other Options Are Incorrect
+
+- **Switch to a cheaper on-demand model for all requests:** Switching to a smaller or cheaper model might reduce token costs slightly, but it still incurs inference costs and latency for _every single call_. Furthermore, smaller models may fail to accurately answer the "complex, factual questions" described in the scenario.
+
+- **Implement Provisioned Throughput:** Provisioned Throughput reserves dedicated GPU hardware at a fixed hourly cost. While it guarantees throughput, it does not prevent unnecessary, duplicate processing of the exact same query, making it an expensive and inefficient choice for solving repetitive static requests.
+
+- **Use AWS Step Functions to manage retries:** AWS Step Functions is an orchestration service used to manage multi-step workflows and error handling. It does not cache outputs or reduce model invocation calls for duplicate queries.
+
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding cost optimization and performance for repetitive queries on the exam, use these mappings:
+
+- _"Repetitive / Idempotent queries" / "Frequently asked identical questions"_ ➔ **Prompt-Response Caching (Amazon ElastiCache / DynamoDB)**
+
+- _"Reduce latency to single-digit milliseconds for repeated prompts"_ ➔ **Caching layer**
+
+- _"Reduce LLM invocation costs for static data"_ ➔ **Caching layer**
+
+
+
+_____
+A developer is fine-tuning a Foundation Model on Amazon SageMaker. The model starts performing extremely well on the training and validation datasets but performs poorly on new, unseen production data. Which issue is the model most likely suffering from? 
+
+Underfitting 
+
+Tokenization Error 
+
+Model Drift 
+
+Overfitting 
+
+The correct answer is **Overfitting**.
+
+### Why This Is the Correct Solution
+
+In machine learning, **Overfitting** (also known as high variance) occurs when a model learns the specific details, noise, and exact examples in the training dataset too well. Instead of learning the underlying, generalizable patterns, the model essentially "memorizes" the data it was trained and validated on.
+
+As a result, when the model is exposed to truly new, unseen production data that differs even slightly from the exact examples it memorized, its performance drops significantly. It has failed to generalize. (Note: If a model performs well on validation but poorly on production, it often means the validation dataset was too similar to the training dataset, or the developer "overfit to the validation set" by tuning hyperparameters too aggressively to get a perfect validation score).
+
+### Why the Other Options Are Incorrect
+
+- **Underfitting:** This is the opposite problem (high bias). An underfit model is too simple and fails to capture the underlying patterns at all. It would perform poorly on _both_ the training data and the new production data.
+
+- **Model Drift:** While model drift also results in poor performance in production, it refers to a _gradual degradation over time_ after a model has been deployed. It happens because the real-world environment changes (e.g., consumer behavior shifts, language evolves), causing the original training data to become outdated. It does not refer to the immediate failure of a newly trained model to generalize.
+
+- **Tokenization Error:** This is a data preprocessing issue where text is incorrectly chunked into tokens before being fed to the model. This typically results in immediate gibberish output or API errors, not a high-performing validation score that drops in production.
+
+### 🔑 AIP-C01 Exam Keywords to Remember
+
+When you see questions regarding model evaluation and performance on the exam, use these mappings:
+
+- _"Perfect on training, fails on unseen data" / "Fails to generalize"_ ➔ **Overfitting (High Variance)**
+
+- _"Poor performance on both training and test data"_ ➔ **Underfitting (High Bias)**
+
+- _"Model performance degrades over time in production"_ ➔ **Model Drift / Concept Drift**
+
+- _"Methods to fix overfitting"_ ➔ **Get more diverse data, use data augmentation, implement early stopping, or use regularization (L1/L2/Dropout).**
+
+_______

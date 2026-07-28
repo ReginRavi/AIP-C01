@@ -1,5 +1,41 @@
+# OS generated files
 .DS_Store
-**/.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Obsidian workspace state & local cache
 .obsidian/
+**/workspace.json
+**/workspace-mobile.json
 **/workspace*.json
+**/.obsidian/cache/
+**/.obsidian/backups/
+
+# Editor & IDE files
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+*.tmp
+*.log
+
+# Environment & sensitive files
+.env
+.env.local
+.env.*.local
+
+# Node & Build artifacts
+node_modules/
+dist/
+build/
 

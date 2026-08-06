@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon OpenSearch Vector Search Optimization Lab | GenAI Architecture</title>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation / Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="logo-icon">
+        <i class="fa-solid fa-network-wired"></i>
+      </div>
+      <div>
+        <h1>OpenSearch Vector Search Optimization Lab</h1>
+        <p class="subtitle">High-Scale Recommendation API Troubleshooting & Performance Tuning (50M+ Vectors)</p>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-aws"><i class="fa-brands fa-aws"></i> AWS OpenSearch Service</span>
+      <span class="badge badge-knn"><i class="fa-solid fa-diagram-project"></i> k-NN HNSW Engine</span>
+      <span class="badge badge-scale"><i class="fa-solid fa-database"></i> 50M Article Corpus</span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-layout">
+    
+    <!-- Left Sidebar: Controls & Scenario Presets -->
+    <aside class="control-panel">
+      <!-- Scenario Presets Card -->
+      <section class="card preset-card">
+        <h3><i class="fa-solid fa-sliders"></i> Scenario Presets</h3>
+        <p class="card-desc">Simulate production failure modes and apply verified AWS GenAI architecture fixes:</p>
+        <div class="preset-buttons">
+          <button class="btn btn-preset active" id="btnPresetDefault" data-preset="default">
+            <div class="preset-title"><i class="fa-solid fa-triangle-exclamation"></i> Unoptimized State</div>
+            <div class="preset-sub">Hot Shards + Untuned HNSW (`efSearch` default, high latency)</div>
+          </button>
+          <button class="btn btn-preset" id="btnPresetHnsw" data-preset="hnsw">
+            <div class="preset-title"><i class="fa-solid fa-sliders"></i> Solution 1: HNSW Tuning</div>
+            <div class="preset-sub">Adjust `M`, `efConstruction`, `efSearch` for high recall</div>
+          </button>
+          <button class="btn btn-preset" id="btnPresetShards" data-preset="shards">
+            <div class="preset-title"><i class="fa-solid fa-border-all"></i> Solution 2: Shard Rebalancing</div>
+            <div class="preset-sub">Re-index & distribute vector shards evenly</div>
+          </button>
+          <button class="btn btn-preset" id="btnPresetFullyOptimized" data-preset="optimized">
+            <div class="preset-title"><i class="fa-solid fa-circle-check"></i> Fully Optimized</div>
+            <div class="preset-sub">HNSW Tuned + Balanced Shards + Low Latency</div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Workload Surge Generator -->
+      <section class="card slider-card">
+        <h3><i class="fa-solid fa-bolt"></i> Traffic & Corpus Scale</h3>
+        
+        <div class="input-group">
+          <div class="label-row">
+            <label for="sliderTraffic">Query Load Surge (QPS):</label>
+            <span class="value-display" id="valTraffic">1,200 QPS</span>
+          </div>
+          <input type="range" id="sliderTraffic" min="100" max="5000" step="100" value="1200">
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="sliderCorpus">Corpus Vector Count:</label>
+            <span class="value-display" id="valCorpus">35 Million</span>
+          </div>
+          <input type="range" id="sliderCorpus" min="1" max="50" step="1" value="35">
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="selectDim">Vector Embedding Model:</label>
+          </div>
+          <select id="selectDim" class="custom-select">
+            <option value="768" selected>Amazon Titan Text Embeddings (768 dim)</option>
+            <option value="1536">OpenAI text-embedding-3 (1536 dim)</option>
+            <option value="1024">Cohere Embed v3 (1024 dim)</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- HNSW Algorithm Parameters Card -->
+      <section class="card slider-card">
+        <h3><i class="fa-solid fa-gear"></i> HNSW Algorithm Parameters</h3>
+        <p class="card-desc">Tradeoff controls between query latency, graph recall, and memory.</p>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="sliderM">M (Max Links per Node):</label>
+            <span class="value-display" id="valM">16</span>
+          </div>
+          <input type="range" id="sliderM" min="4" max="64" step="4" value="16">
+          <div class="input-hint">Higher M = better recall for high dimensions, increased graph memory.</div>
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="sliderEfConst">efConstruction (Build Search Depth):</label>
+            <span class="value-display" id="valEfConst">100</span>
+          </div>
+          <input type="range" id="sliderEfConst" min="32" max="500" step="16" value="100">
+          <div class="input-hint">Higher = higher quality graph index, slower initial indexing.</div>
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="sliderEfSearch">efSearch (Query Search Depth):</label>
+            <span class="value-display" id="valEfSearch">16</span>
+          </div>
+          <input type="range" id="sliderEfSearch" min="8" max="256" step="8" value="16">
+          <div class="input-hint">Higher = prevents missing relevant articles, increases search time.</div>
+        </div>
+      </section>
+
+      <!-- Shard & Node Architecture Card -->
+      <section class="card slider-card">
+        <h3><i class="fa-solid fa-server"></i> Cluster Topology & Sharding</h3>
+        
+        <div class="input-group">
+          <div class="label-row">
+            <label for="selectNodes">OpenSearch Data Nodes:</label>
+            <span class="value-display" id="valNodes">4 Nodes</span>
+          </div>
+          <input type="range" id="selectNodes" min="2" max="8" step="1" value="4">
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="selectShards">Primary Shard Count:</label>
+            <span class="value-display" id="valShards">4 Shards</span>
+          </div>
+          <input type="range" id="selectShards" min="1" max="16" step="1" value="4">
+        </div>
+
+        <div class="input-group">
+          <div class="label-row">
+            <label for="selectRouting">Routing & Shard Balancing:</label>
+          </div>
+          <select id="selectRouting" class="custom-select">
+            <option value="imbalanced" selected>Unbalanced / Key Hotspotting (Default)</option>
+            <option value="rebalanced">Re-indexed & Uniform Hashed (Balanced)</option>
+          </select>
+        </div>
+
+        <button class="btn btn-action" id="btnReindex">
+          <i class="fa-solid fa-rotate"></i> Trigger Shard Rebalancing (_reindex)
+        </button>
+      </section>
+    </aside>
+
+    <!-- Main Content Area: Visualizations, Heatmaps, Recommendations -->
+    <section class="dashboard-content">
+
+      <!-- Executive KPI Cards Bar -->
+      <div class="kpi-grid">
+        <div class="kpi-card" id="kpiLatency">
+          <div class="kpi-icon icon-latency"><i class="fa-solid fa-stopwatch"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-label">P99 Query Latency</span>
+            <span class="kpi-value" id="kpiValLatency">465 ms</span>
+            <span class="kpi-status status-critical" id="kpiStatusLatency"><i class="fa-solid fa-triangle-exclamation"></i> High Spike</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpiRecall">
+          <div class="kpi-icon icon-recall"><i class="fa-solid fa-bullseye"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-label">Recommendation Recall @ 10</span>
+            <span class="kpi-value" id="kpiValRecall">58.4%</span>
+            <span class="kpi-status status-warning" id="kpiStatusRecall"><i class="fa-solid fa-circle-exclamation"></i> Irrelevant Results</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpiHotShard">
+          <div class="kpi-icon icon-shard"><i class="fa-solid fa-fire-flame-curved"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-label">Hot Shard Max CPU</span>
+            <span class="kpi-value" id="kpiValHotShard">98.2%</span>
+            <span class="kpi-status status-critical" id="kpiStatusHotShard"><i class="fa-solid fa-temperature-arrow-up"></i> Overloaded Shard 1</span>
+          </div>
+        </div>
+
+        <div class="kpi-card" id="kpiThroughput">
+          <div class="kpi-icon icon-throughput"><i class="fa-solid fa-gauge-high"></i></div>
+          <div class="kpi-info">
+            <span class="kpi-label">Successful Vector QPS</span>
+            <span class="kpi-value" id="kpiValThroughput">680 / 1200</span>
+            <span class="kpi-status status-warning" id="kpiStatusThroughput">Throttling 43%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shard Load Heatmap & Cluster Topology Visualization -->
+      <div class="card graph-card">
+        <div class="card-header">
+          <div>
+            <h2><i class="fa-solid fa-cubes-stacked"></i> OpenSearch Cluster Shard Load Heatmap</h2>
+            <p class="card-desc">Visualizes vector distribution and query traffic density across primary & replica shards.</p>
+          </div>
+          <div class="card-legend">
+            <span class="legend-item"><span class="color-box bg-green"></span> Balanced (&lt;50%)</span>
+            <span class="legend-item"><span class="color-box bg-yellow"></span> Elevated (50-80%)</span>
+            <span class="legend-item"><span class="color-box bg-red"></span> Hot Shard (&gt;80%)</span>
+          </div>
+        </div>
+        <div class="cluster-nodes-container" id="clusterNodesContainer">
+          <!-- Dynamic Node Cards will be rendered here by app.js -->
+        </div>
+      </div>
+
+      <!-- Interactive HNSW Vector Spatial Search Graph & Candidate Traversal -->
+      <div class="card graph-card">
+        <div class="card-header">
+          <div>
+            <h2><i class="fa-solid fa-diagram-project"></i> HNSW Graph Vector Traversal Simulator</h2>
+            <p class="card-desc">Shows how `efSearch` parameter controls candidate queue size and prevents missing semantically relevant article vectors.</p>
+          </div>
+          <div class="hnsw-stats-badge">
+            <span id="hnswHopsText">Hops Evaluated: 14</span> | 
+            <span id="hnswCandidatesText">Candidate Queue (efSearch): 16</span>
+          </div>
+        </div>
+        <div class="canvas-container">
+          <canvas id="hnswCanvas" width="900" height="320"></canvas>
+        </div>
+      </div>
+
+      <!-- Recommendation API Sandbox: Before vs After Semantic Results -->
+      <div class="card api-sandbox-card">
+        <div class="card-header">
+          <div>
+            <h2><i class="fa-solid fa-newspaper"></i> Recommendation API Sandbox: "Related Articles"</h2>
+            <p class="card-desc">Test real-time semantically rich queries against article embeddings to verify relevance score and latency.</p>
+          </div>
+        </div>
+
+        <div class="api-query-bar">
+          <div class="query-input-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="inputQuery" value="Generative AI LLM applications in financial stock market forecasting" placeholder="Enter semantically rich query...">
+          </div>
+          <button class="btn btn-primary" id="btnRunQuery"><i class="fa-solid fa-paper-plane"></i> Execute Vector Search</button>
+        </div>
+
+        <div class="recommendations-comparison">
+          <!-- Current System Output -->
+          <div class="recommendation-column">
+            <div class="col-header bg-current">
+              <span><i class="fa-solid fa-server"></i> Current OpenSearch Vector Retrieval</span>
+              <span class="badge" id="recLatencyCurrent">465ms</span>
+            </div>
+            <div class="article-list" id="listCurrentArticles">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Ground Truth / Target Optimized Output -->
+          <div class="recommendation-column">
+            <div class="col-header bg-target">
+              <span><i class="fa-solid fa-wand-magic-sparkles"></i> Fully Tuned HNSW & Balanced Vector Retrieval</span>
+              <span class="badge badge-success" id="recLatencyTarget">24ms</span>
+            </div>
+            <div class="article-list" id="listTargetArticles">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Metrics & OpenSearch Trace Analytics Breakdown -->
+      <div class="charts-row">
+        <div class="card chart-card-half">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-chart-line"></i> Latency (P50 vs P99) & Recall @ K</h3>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartLatencyRecall"></canvas>
+          </div>
+        </div>
+
+        <div class="card chart-card-half">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-layer-group"></i> OpenSearch Trace Analytics Span Waterfall</h3>
+          </div>
+          <div class="trace-waterfall" id="traceWaterfall">
+            <div class="trace-item">
+              <div class="trace-label">1. Request Ingestion & Auth</div>
+              <div class="trace-bar-bg"><div class="trace-bar" style="width: 5%; background: #3b82f6;"></div></div>
+              <div class="trace-time">3 ms</div>
+            </div>
+            <div class="trace-item" id="traceHotShardSpan">
+              <div class="trace-label">2. Shard Routing & Queueing (Hot Shard Bottleneck)</div>
+              <div class="trace-bar-bg"><div class="trace-bar" style="width: 65%; background: #ef4444;"></div></div>
+              <div class="trace-time" id="timeShardQueue">310 ms</div>
+            </div>
+            <div class="trace-item" id="traceHnswSpan">
+              <div class="trace-label">3. HNSW k-NN Graph Traversal (`efSearch`)</div>
+              <div class="trace-bar-bg"><div class="trace-bar" style="width: 25%; background: #f59e0b;"></div></div>
+              <div class="trace-time" id="timeHnswTraversal">135 ms</div>
+            </div>
+            <div class="trace-item">
+              <div class="trace-label">4. Doc Fetch & JSON Serialization</div>
+              <div class="trace-bar-bg"><div class="trace-bar" style="width: 5%; background: #10b981;"></div></div>
+              <div class="trace-time">17 ms</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Technical Architecture Reference & Code Payloads -->
+      <div class="card code-reference-card">
+        <div class="card-header">
+          <div>
+            <h2><i class="fa-solid fa-code"></i> OpenSearch API Index Mapping & Tuning Snippet</h2>
+            <p class="card-desc">Exact OpenSearch REST API payload for tuning HNSW parameters and reindexing shards.</p>
+          </div>
+          <button class="btn btn-sm" id="btnCopyCode"><i class="fa-solid fa-copy"></i> Copy JSON</button>
+        </div>
+        <pre class="code-block"><code id="codeSnippet">{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 128,
+      "number_of_shards": 8,
+      "number_of_replicas": 1
+    }
+  },
+  "mappings": {
+    "properties": {
+      "article_vector": {
+        "type": "knn_vector",
+        "dimension": 768,
+        "method": {
+          "name": "hnsw",
+          "space_type": "cosinesimil",
+          "engine": "lucene",
+          "parameters": {
+            "m": 32,
+            "ef_construction": 250
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <p>AWS Generative AI Engineer Architecture Lab &mdash; OpenSearch k-NN Vector Search Performance & Relevance Optimization</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

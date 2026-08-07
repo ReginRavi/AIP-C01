@@ -1,4 +1,4 @@
-In the context of AI and Generative AI, these services are the **orchestration and decoupling layer**—they are how you connect different AI services, manage configuration, handle traffic spikes, and automate complex ML workflows without writing custom integration code.
+ In the context of AI and Generative AI, these services are the **orchestration and decoupling layer**—they are how you connect different AI services, manage configuration, handle traffic spikes, and automate complex ML workflows without writing custom integration code.
 
 ### 1. Amazon AppFlow
 

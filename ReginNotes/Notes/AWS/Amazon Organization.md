@@ -1,3 +1,9 @@
+AWS Organizations has two available feature sets:
+
+All features – This feature set is the preferred way to work with AWS Organizations, and it includes Consolidating Billing features. When you create an organization, enabling all features is the default. With all features enabled, you can use the advanced account management features available in AWS Organizations such as integration with supported AWS services and organization management policies. Policies in AWS Organizations enable you to apply additional types of management to the AWS accounts in your organization. You can use policies when all features are enabled in your organization. Service control policies (SCPs) offer central control over the maximum available permissions for all of the accounts in your organization.
+
+Consolidated Billing features – All organizations support this subset of features, which provides basic management tools that you can use to centrally manage the accounts in your organization. <mark style="background:#fff88f">You cannot leverage SCPs in this feature mode.</mark>
+
 **AWS Organizations** is a <mark style="background:#fff88f">centralized account management and governance service</mark> that allows you to consolidate, organize, and manage multiple AWS accounts under a single hierarchy.
 
 It provides a unified way to manage security boundaries, automate account provisioning, share resources, and consolidate billing across an entire organization.

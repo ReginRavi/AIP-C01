@@ -158,3 +158,15 @@ flowchart LR
 - **Multiple File Shares:**
     
     - If the same S3 bucket or prefix is mounted on multiple file shares, `RefreshCache` must be invoked on **each file share ARN individually**.
+
+
+____________
+**Enable Amazon S3 server access logging to capture all bucket-level and object-level events**
+
+**Enable AWS CloudTrail data events to enable object-level logging for S3 bucket**
+
+To find the IP addresses for object-level requests to Amazon S3 (uploads and downloads), you must first enable one of the following logging methods:
+
+1. Amazon S3 server access logging captures all bucket-level and object-level events. These logs use a format similar to Apache web server logs. After you enable server access logging, review the logs to find the IP addresses used with each upload to your bucket.
+    
+2. AWS CloudTrail data events capture the last 90 days of bucket-level events (for example, PutBucketPolicy and DeleteBucketPolicy), and you can enable object-level logging. These logs use a JSON format. After you enable object-level logging with data events, review the logs to find the IP addresses used with each upload to your bucket. It might take a few hours for AWS CloudTrail to start creating logs.

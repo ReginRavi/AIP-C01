@@ -1,5 +1,5 @@
 
-AWS SageMaker and AWS Bedrock represent two different approaches by AWS to help organizations adopt machine learning and artificial intelligence.
+Amazon SageMaker and Amazon Bedrock represent two different approaches by AWS to help organizations adopt machine learning and artificial intelligence.
 
 The easiest way to differentiate them is by who they are for and how they operate:
 
@@ -8,7 +8,7 @@ The easiest way to differentiate them is by who they are for and how they operat
 - **Bedrock is a managed API service for _using_ pre-built AI (specifically Foundation Models).** It is aimed at application developers.
 ### At-a-Glance Comparison
 
-| Feature                  | AWS SageMaker                                                | AWS Bedrock                                                         |
+| Feature                  | Amazon SageMaker                                                | Amazon Bedrock                                                         |
 | ------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------- |
 | **Primary Focus**        | General Machine Learning (Classical & GenAI)                 | Generative AI only                                                  |
 | **Model Type**           | Create your own, or deploy models from open sources.         | Pre-built "Foundation Models" from leading providers.               |
@@ -20,9 +20,9 @@ The easiest way to differentiate them is by who they are for and how they operat
 | **Pricing**              | Based on compute instances, storage, and duration.           | Based on "tokens" processed (input/output) or dedicated throughput. |
 ### In-Depth Breakdown
 
-#### 1. AWS SageMaker: The ML Factory
+#### 1. Amazon SageMaker: The ML Factory
 
-AWS SageMaker is a comprehensive platform launched in 2017. It covers the entire machine learning lifecycle: data preparation, building (writing model code), training (managed compute clusters), deployment (creating an API endpoint), and monitoring the model’s performance.
+Amazon SageMaker is a comprehensive platform launched in 2017. It covers the entire machine learning lifecycle: data preparation, building (writing model code), training (managed compute clusters), deployment (creating an API endpoint), and monitoring the model’s performance.
 
 **When to choose SageMaker:**
 
@@ -33,9 +33,9 @@ AWS SageMaker is a comprehensive platform launched in 2017. It covers the entir
 - **Infrastructure Tuning:** You need to choose specific compute instances (GPUs/CPUs) or optimize a model to fit on edge devices.
 
 - **SageMaker JumpStart (The Grey Area):** SageMaker _does_ have a library called JumpStart that allows you to deploy popular open-source Large Language Models (LLMs) like Meta's Llama or Mistral on your own SageMaker infrastructure. This is useful if you want to run your own dedicated instance of an open-source model.
-#### 2. AWS Bedrock: The GenAI API
+#### 2. Amazon Bedrock: The GenAI API
 
-AWS Bedrock, introduced in 2023, is a managed service that provides access to leading foundation models (FMs) via a single API call. Instead of choosing a server, installing dependencies, and deploying a model endpoint, you simply send text (or images) to Bedrock and get text (or images) back.
+Amazon Bedrock, introduced in 2023, is a managed service that provides access to leading foundation models (FMs) via a single API call. Instead of choosing a server, installing dependencies, and deploying a model endpoint, you simply send text (or images) to Bedrock and get text (or images) back.
 
 Bedrock offers models from providers including:
 - Anthropic (Claude)
@@ -71,6 +71,6 @@ Bedrock offers models from providers including:
 
 The choice between SageMaker and Bedrock usually depends on whether your priority is control or convenience.
 
-- Choose **AWS Bedrock** if you want the easiest and fastest path to integrate cutting-edge, general-purpose LLMs (like Claude) into your applications without managing any hardware.
+- Choose **Amazon Bedrock** if you want the easiest and fastest path to integrate cutting-edge, general-purpose LLMs (like Claude) into your applications without managing any hardware.
 
-- Choose **AWS SageMaker** if you need to solve a specific classical machine learning problem (like forecasting),need to build a truly custom model from scratch, or require the ability to run your own dedicated, open-source model endpoint.
+- Choose **Amazon SageMaker** if you need to solve a specific classical machine learning problem (like forecasting),need to build a truly custom model from scratch, or require the ability to run your own dedicated, open-source model endpoint.

@@ -1,0 +1,2 @@
+
+Amazon S3 Transfer Acceleration is a bucket-level feature that enables<mark style="background:#fff88f"> fast, easy, and secure transfers </mark>of files over long distances <mark style="background:#fff88f">between your client and an S3 bucket. </mark>Transfer Acceleration is designed to optimize transfer speeds from across the world into S3 buckets

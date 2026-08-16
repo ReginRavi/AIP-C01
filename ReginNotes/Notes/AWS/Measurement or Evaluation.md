@@ -1,7 +1,7 @@
 
 Evaluating Retrieval-Augmented Generation (RAG) systems requires assessing two distinct components that operate sequentially: **the Retriever** (vector store and search algorithm) and **the Generator** (the Foundation Model).
 
-For the **AWS Certified Generative AI Developer - Professional (AIP-C01)** exam and production systems, RAG evaluation is broken down into specific metric frameworks, diagnostic use cases, and AWS Bedrock platform capabilities.
+For the **AWS Certified Generative AI Developer - Professional (AIP-C01)** exam and production systems, RAG evaluation is broken down into specific metric frameworks, diagnostic use cases, and Amazon Bedrock platform capabilities.
 
 ### 1. The Core Metrics Framework
 
@@ -66,7 +66,7 @@ In practice and on the exam, evaluation metrics act as a diagnostic tree to iden
 |**Low Faithfulness** (High Hallucination)|The LLM generates facts outside the provided context.|• Strengthen system prompts (_"Answer using ONLY the context provided..."_).<br><br>  <br><br>• Reduce model temperature ($\approx 0.0$).<br><br>  <br><br>• Switch to a stronger reasoning model (e.g., Nova Pro, Claude Sonnet).|
 |**Low Answer Relevancy**|The answer is grounded in context but strays from user intent.|• Improve prompt template structure or provide few-shot examples.<br><br>  <br><br>• Add explicit formatting guidelines.|
 
-### 3. AWS Bedrock Model Evaluations (AIP-C01 Focus)
+### 3. Amazon Bedrock Model Evaluations (AIP-C01 Focus)
 
 Amazon Bedrock provides native evaluation mechanisms for RAG systems and Foundation Models.
 

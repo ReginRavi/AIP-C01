@@ -2254,7 +2254,7 @@ Resend Prompt + History
 ↓
 Continue Processing
  
-For AWS Bedrock streaming APIs:
+For Amazon Bedrock streaming APIs:
  
 Transient API failure before response
 → SDK retries

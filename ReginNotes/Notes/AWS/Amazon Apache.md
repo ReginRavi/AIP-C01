@@ -13,6 +13,9 @@ Incorrect options:
 **Store the data in compressed .csv, partitioned by date and sorted by device type**
 
 Both the above options are not columnar storage formats, they are row-based formats that are not optimal for big data retrievals for complex analytical queries.
+#AWS
+#Apache
+
 
 Reference:
 

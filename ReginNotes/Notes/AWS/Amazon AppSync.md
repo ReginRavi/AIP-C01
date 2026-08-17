@@ -1,3 +1,6 @@
+#AppSync
+
+
 **Configure Amazon S3 for hosting the web application while using AWS AppSync for database access services. Use Amazon Simple Queue Service (Amazon SQS) for queuing orders and AWS Lambda for business logic. Use Amazon SQS dead-letter queue for tracking and re-processing failed orders**
 
 Amazon S3 can be configured to host a web application.

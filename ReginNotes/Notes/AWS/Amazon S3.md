@@ -170,3 +170,48 @@ To find the IP addresses for object-level requests to Amazon S3 (uploads and dow
 1. Amazon S3 server access logging captures all bucket-level and object-level events. These logs use a format similar to Apache web server logs. After you enable server access logging, review the logs to find the IP addresses used with each upload to your bucket.
     
 2. AWS CloudTrail data events capture the last 90 days of bucket-level events (for example, PutBucketPolicy and DeleteBucketPolicy), and you can enable object-level logging. These logs use a JSON format. After you enable object-level logging with data events, review the logs to find the IP addresses used with each upload to your bucket. It might take a few hours for AWS CloudTrail to start creating logs.
+
+_________
+An Amazon S3 bucket is shared by three different teams (managing their own separate AWS accounts) for document uploads. Initially, the S3 bucket settings were set to default. Later, the bucket sees the following updates:
+
+After week 1, S3 Object Ownership bucket-level settings were used and all Access Control Lists (ACLs) were disabled. The three teams uploaded their documents to the shared bucket with this new setting.
+
+After week 2, S3 bucket level settings were again set back to default and the ACLs were enabled once more
+
+What is the outcome of these action(s) on the documents uploaded after week 1 and what are the key points of consideration for future S3 bucket configurations? (Select two)
+
+Correct options:
+
+**You, as the bucket owner, still own any objects that were written to the bucket while the `bucket owner enforced` setting was applied. These objects are not owned by the `object writer`, even if you re-enable ACLs**
+
+**If you used object ACLs for permissions management before you applied the `bucket owner enforced` setting and you didn't migrate these object ACL permissions to your bucket policy after you re-enable ACLs, these permissions are restored** -
+
+You can re-enable ACLs by changing from the bucket owner-enforced setting to another Object Ownership setting at any time. If you used object ACLs for permissions management before you applied the bucket owner-enforced setting and you didn't migrate these object ACL permissions to your bucket policy, after you re-enable ACLs, these permissions are restored. Additionally, objects written to the bucket while the bucket owner enforced setting was applied are still owned by the bucket owner.
+
+For example, if you change from the bucket owner-enforced setting back to object writer, you, as the bucket owner, no longer own and have full control over objects that were previously owned by other AWS accounts. Instead, the uploading accounts again own these objects. Objects owned by other accounts use ACLs for permissions, so you can't use policies to grant permissions to these objects. However, you, as the bucket owner, still own any objects that were written to the bucket while the bucket owner-enforced setting was applied. These objects are not owned by the object writer, even if you re-enable ACLs.
+
+Changes introduced by disabling ACLs: 
+
+![](https://assets-pt.media.datacumulus.com/aws-sap-pt/assets/pt3-q20-i1.jpg)
+
+ via - [https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html)
+
+Incorrect options:
+
+**If you used object ACLs for permissions management before you applied the `bucket owner enforced` setting and you didn't migrate these object ACL permissions to your bucket policy after you re-enable ACLs, these permissions are not restored** - As explained above, the permissions are restored for this scenario. So this option is incorrect.
+
+**To simplify permissions management and auditing, use the `Bucket owner preferred` S3 bucket setting** - This statement is incorrect. AWS recommends that you disable ACLs by choosing the `bucket owner enforced` setting and use your bucket policy to share data with users outside of your account as needed. This approach simplifies permissions management and auditing. You can disable ACLs on both newly created and already existing buckets.
+
+**You, as the bucket owner, will not own the objects that were written to the bucket while the `bucket owner enforced setting` was applied. These objects will again be owned by the object writer, when you re-enable the ACLs** - This statement is incorrect. You, as the bucket owner, still own any objects that were written to the bucket while the bucket owner-enforced setting was applied. These objects are not owned by the object writer, even if you re-enable ACLs.
+
+Reference:
+
+[https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html)
+
+### S3 Object Ownership Modes Comparison
+
+| **Ownership Setting**                         | **ACLs Status**                   | **Who Owns New Uploads?**                                                  | **Access Managed By**           |
+| --------------------------------------------- | --------------------------------- | -------------------------------------------------------------------------- | ------------------------------- |
+| **Bucket Owner Enforced** _(AWS Recommended)_ | **Disabled** (Completely ignored) | **Bucket Owner**                                                           | Bucket Policies & IAM only      |
+| **Bucket Owner Preferred**                    | Enabled                           | **Bucket Owner** (if uploaded with `bucket-owner-full-control` canned ACL) | Bucket Policy + ACLs            |
+| **Object Writer** _(Legacy Default)_          | Enabled                           | **Uploading AWS Account**                                                  | Object & Bucket ACLs + Policies |

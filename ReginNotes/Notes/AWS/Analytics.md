@@ -2,7 +2,7 @@ hese services are the **data pipeline layer**—how you ingest, store, clean, a
 
 ### 1. Amazon Athena
 
-- **Benefits:** It is a serverless, interactive query service. There is no infrastructure to manage or database to set up. It integrates directly with [[Amazon SageMaker]] (Athena ML), allowing you to write SQL statements that run ML inferences.
+- **Benefits:** It is a serverless, interactive query service. There is no infrastructure to manage or database to set up. It integrates directly with [[Amazon Sagemaker]] (Athena ML), allowing you to write SQL statements that run ML inferences.
 
 - **When to Use (AIP-C01 Triggers):** Look for phrases like _"Ad-hoc SQL queries on S3,"_ _"Analyze unstructured data in S3 without loading it into a database,"_ or _"Invoke machine learning models using SQL."_
 

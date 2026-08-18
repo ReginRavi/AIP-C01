@@ -1,0 +1,1017 @@
+# Hybrid DNS — AWS Exam-Oriented Deep Dive
+
+For the exam, think of **Hybrid DNS** as:
+
+> **“How do DNS queries get resolved when some resources are in AWS and others are on-premises?”**
+
+The core services are:
+
+* **Amazon Route 53**
+* **Route 53 Resolver**
+* **Route 53 Resolver endpoints**
+* **On-premises DNS servers**
+* **VPC DNS**
+* **AWS Private Hosted Zones**
+* **Route 53 Resolver forwarding rules**
+
+The most important mental model is:
+
+```mermaid
+flowchart TD
+    subgraph HybridEnv["HYBRID ENVIRONMENT"]
+        subgraph AWSVPC["AWS VPC"]
+            AWSRes["AWS resources"]
+        end
+        subgraph OnPrem["On-Premises"]
+            OnPremDNS["DNS servers"]
+        end
+    end
+    AWSRes <-->|"DNS queries"| OnPremDNS
+```
+
+---
+
+# 1. First: What is DNS?
+
+DNS translates names into IP addresses.
+
+```mermaid
+flowchart LR
+    Domain["www.example.com"] --> DNS["DNS"] --> IP["203.0.113.10"]
+```
+
+Without DNS, applications would need to know IP addresses directly.
+
+In a hybrid environment, you can have **two DNS worlds**:
+
+```text
+AWS
+│
+├── app.aws.internal
+├── db.aws.internal
+└── service.aws.internal
+
+On-Premises
+│
+├── app.corp.example
+├── db.corp.example
+└── printer.corp.example
+```
+
+The challenge is:
+
+> **How can AWS resolve on-premises names, and how can on-premises systems resolve AWS names?**
+
+That's what **hybrid DNS integration** solves.
+
+---
+
+# 2. The Core AWS Service: Route 53 Resolver
+
+This is the most important service for this topic.
+
+**Route 53 Resolver** provides DNS resolution for VPCs.
+
+Conceptually:
+
+```mermaid
+flowchart TD
+    EC2["EC2"] -->|"DNS query"| VPCDNS["VPC DNS Resolver"] --> R53Resolver["Route 53 Resolver"]
+```
+
+AWS provides DNS resolution inside VPCs automatically.
+
+You don't normally deploy your own DNS server just to resolve normal AWS/VPC DNS names.
+
+### Exam mindset
+
+If the question says:
+
+> "DNS resolution within an AWS VPC"
+
+Think:
+
+**Route 53 Resolver / VPC DNS**
+
+---
+
+# 3. Why Do We Need Hybrid DNS?
+
+Imagine:
+
+```mermaid
+flowchart TD
+    subgraph CorporateNetwork["Corporate Network"]
+        DNSServer["DNS Server<br/>10.0.0.10"]
+    end
+
+    subgraph AWSVPC["AWS VPC"]
+        AWSApps["EC2 / RDS / Apps"]
+    end
+
+    DNSServer <== "VPN / DX" ==> AWSApps
+```
+
+On-premises has:
+
+```text
+db.corp.example → 10.10.20.30
+```
+
+AWS has:
+
+```text
+database.aws.internal → 10.20.30.40
+```
+
+Applications may need to resolve **both**.
+
+So we need:
+
+```text
+AWS DNS  ←→  On-prem DNS
+```
+
+---
+
+# 4. The Two Most Important Resolver Endpoints
+
+Memorize this:
+
+## Inbound Endpoint
+
+> **On-premises → AWS DNS**
+
+```mermaid
+flowchart LR
+    OnPrem["ON-PREM"] -->|"DNS query"| InboundEP["Inbound Resolver Endpoint"] --> AWSDNS["AWS DNS"]
+```
+
+Example:
+
+On-prem application asks:
+
+```text
+db.aws.internal
+```
+
+The query goes:
+
+```mermaid
+flowchart LR
+    OnPremDNS["On-prem DNS"] --> Link["VPN / Direct Connect"] --> InboundEP["Route 53 Resolver INBOUND endpoint"] --> AWSDNS["AWS DNS"] --> IP["IP address"]
+```
+
+### Exam clue
+
+> "On-premises clients need to resolve private AWS DNS names."
+
+→ **Route 53 Resolver inbound endpoint**
+
+---
+
+# 5. Outbound Endpoint
+
+Reverse direction.
+
+> **AWS → On-premises DNS**
+
+```mermaid
+flowchart LR
+    AWSVPC["AWS VPC"] -->|"DNS query"| OutboundEP["Outbound Resolver Endpoint"] --> Link["VPN / Direct Connect"] --> OnPremDNS["On-prem DNS"]
+```
+
+Example:
+
+AWS EC2 asks:
+
+```text
+server.corp.example
+```
+
+The Resolver sees that `corp.example` should be resolved by the corporate DNS server.
+
+It forwards the query:
+
+```mermaid
+flowchart LR
+    EC2["EC2"] --> R53["Route 53 Resolver"] --> OutboundEP["Outbound endpoint"] --> Link["VPN/DX"] --> CorpDNS["Corporate DNS"] --> IP["IP"]
+```
+
+### Exam clue
+
+> "AWS resources need to resolve on-premises DNS names."
+
+→ **Route 53 Resolver outbound endpoint + forwarding rule**
+
+---
+
+# 6. The Easiest Way to Remember Inbound vs Outbound
+
+Don't think about AWS terminology.
+
+Think about **where the DNS query starts**.
+
+```mermaid
+flowchart TD
+    Q1["Query starts ON-PREMISES"] --> IN["INBOUND"] --> A1["AWS DNS"]
+```
+
+```mermaid
+flowchart TD
+    Q2["Query starts in AWS"] --> OUT["OUTBOUND"] --> A2["On-prem DNS"]
+```
+
+### Memorize:
+
+> **Inbound = into AWS Resolver**
+
+> **Outbound = out of AWS Resolver**
+
+---
+
+# 7. High-Level Architecture
+
+A typical hybrid DNS architecture looks like this:
+
+```mermaid
+flowchart TD
+    subgraph AWSCloud["AWS CLOUD / AWS VPC"]
+        EC2["EC2"] -->|"DNS query"| R53["Route 53 Resolver"]
+        R53 -->|"Forwarding Rule"| OutboundEP["Outbound Endpoint"]
+    end
+
+    OutboundEP <== "VPN / Direct Connect" ==> CorpDNS
+
+    subgraph OnPremises["ON-PREMISES"]
+        CorpDNS["Corporate DNS<br/>10.0.0.10"]
+    end
+```
+
+---
+
+# 8. What Is a Resolver Rule?
+
+This is another exam-important concept.
+
+Suppose your company owns:
+
+```text
+corp.example
+```
+
+And the corporate DNS server is:
+
+```text
+10.0.0.10
+```
+
+You can configure a Route 53 Resolver forwarding rule:
+
+```text
+Domain:
+corp.example
+
+Forward to:
+10.0.0.10
+```
+
+Now:
+
+```text
+EC2 asks:
+server.corp.example
+```
+
+Resolver says:
+
+> "corp.example belongs to the corporate DNS system."
+
+Then:
+
+```mermaid
+flowchart LR
+    R53["AWS Resolver"] --> OutboundEP["Outbound endpoint"] --> Target["10.0.0.10"] --> CorpDNS["Corporate DNS"]
+```
+
+---
+
+# 9. Forwarding Rule Illustration
+
+```mermaid
+flowchart TD
+    EC2["EC2 query"] --> R53["Route 53 Resolver"]
+    R53 --> Check{"Is domain corp.example?"}
+    Check -->|YES| Rule["Resolver Rule<br/>corp.example → 10.0.0.10"]
+    Rule --> OutboundEP["Outbound Endpoint"]
+    OutboundEP --> Link["VPN / DX"]
+    Link --> CorpDNS["Corporate DNS"]
+```
+
+This is the standard hybrid DNS pattern.
+
+---
+
+# 10. Reverse Direction: On-Premises → AWS
+
+Now imagine AWS has:
+
+```text
+database.aws.internal
+```
+
+On-premises users need to resolve it.
+
+Architecture:
+
+```mermaid
+flowchart TD
+    CorpDNS["Corporate DNS"] -->|"Query: database.aws.internal"| InboundEP["Inbound Resolver Endpoint"]
+    InboundEP --> R53["Route 53 Resolver"]
+    R53 --> PHZ["Private Hosted Zone"]
+    PHZ --> IP["Private IP"]
+```
+
+This is why **inbound Resolver endpoints** exist.
+
+---
+
+# 11. Private Hosted Zone
+
+A **Route 53 private hosted zone** is used for DNS names inside your VPC.
+
+Example:
+
+```text
+aws.internal
+```
+
+Records:
+
+```text
+db.aws.internal     → 10.20.1.10
+api.aws.internal    → 10.20.2.10
+```
+
+These names are not publicly resolvable.
+
+```mermaid
+flowchart LR
+    Internet["Internet"] -. "X cannot resolve" .-> PHZ["Private Hosted Zone"] --> VPC["VPC"]
+```
+
+But with hybrid DNS:
+
+```mermaid
+flowchart LR
+    OnPrem["On-premises"] --> InboundEP["Inbound Resolver"] --> PHZ["Private Hosted Zone"]
+```
+
+On-premises can resolve the private AWS names.
+
+---
+
+# 12. Route 53 Public Hosted Zone vs Private Hosted Zone
+
+Very important distinction.
+
+|                            | Public Hosted Zone | Private Hosted Zone |
+| -------------------------- | ------------------ | ------------------- |
+| Accessible from Internet   | Yes                | No                  |
+| Used for public websites   | Yes                | No                  |
+| Used for internal services | Sometimes          | **Yes**             |
+| Associated with VPC        | No                 | **Yes**             |
+| Example                    | `example.com`      | `corp.internal`     |
+
+### Exam shortcut
+
+> **Public users → Public Hosted Zone**
+
+> **Private/internal resources → Private Hosted Zone**
+
+---
+
+# 13. Route 53 Resolver vs Route 53 Hosted Zones
+
+Don't confuse them.
+
+### Hosted Zone
+
+Stores DNS records.
+
+```text
+example.internal
+ ├── app → 10.0.1.10
+ ├── db  → 10.0.2.10
+```
+
+### Resolver
+
+Handles DNS queries.
+
+```mermaid
+flowchart LR
+    Client["Client"] --> Resolver["Resolver"] --> Answer["Find answer"]
+```
+
+Think:
+
+> **Hosted Zone = DNS data**
+
+> **Resolver = DNS resolution**
+
+---
+
+# 14. Route 53 Resolver vs Route 53
+
+A useful exam distinction:
+
+### Route 53
+
+Broad DNS service:
+
+* Domain registration
+* Hosted zones
+* DNS records
+* Routing policies
+* Health checks
+* Resolver
+
+### Route 53 Resolver
+
+Specifically focuses on:
+
+* DNS resolution
+* VPC DNS
+* Hybrid DNS
+* DNS forwarding
+* Inbound/outbound endpoints
+
+---
+
+# 15. Associated Services
+
+Hybrid DNS rarely works alone.
+
+You should recognize this architecture:
+
+```mermaid
+flowchart TD
+    subgraph R53Section["DNS"]
+        R53["Route 53 Resolver"]
+    end
+    R53 --> AWS["AWS Private Hosted Zone"]
+    R53 --> OnPrem["On-Prem DNS Server"]
+    AWS <== "Network: VPN / DX / TGW" ==> OnPrem
+```
+
+Associated services can include:
+
+### Networking
+
+* VPC
+* Route tables
+* Transit Gateway
+* Site-to-Site VPN
+* Direct Connect
+
+### DNS
+
+* Route 53
+* Route 53 Resolver
+* Private Hosted Zones
+* Resolver Rules
+
+### Security
+
+* Security Groups
+* Network ACLs
+* DNS query logging
+* IAM
+
+---
+
+# 16. VPN vs Direct Connect in Hybrid DNS
+
+DNS forwarding needs **network connectivity** between AWS and on-premises.
+
+You therefore need something such as:
+
+```mermaid
+flowchart LR
+    AWS["AWS"] --> VPN["VPN"] --> OnPrem["On-prem"]
+    AWS --> DX["Direct Connect"] --> OnPrem
+```
+
+### VPN
+
+Choose when:
+
+* Lower cost
+* Quick deployment
+* Encrypted connectivity
+* Moderate requirements
+
+### Direct Connect
+
+Choose when:
+
+* Dedicated connection
+* Predictable network performance
+* Large-scale enterprise hybrid connectivity
+
+### Exam mindset
+
+Don't choose Direct Connect merely because the question says "hybrid."
+
+Ask:
+
+> **Does the requirement actually need dedicated connectivity?**
+
+If not, VPN may be the lower-cost, lower-overhead solution.
+
+---
+
+# 17. Transit Gateway + Hybrid DNS
+
+Suppose you have:
+
+```mermaid
+flowchart TD
+    OnPrem["On-Prem"] --> TGW["Transit Gateway"]
+    TGW --> VPCA["VPC-A"]
+    TGW --> VPCB["VPC-B"]
+    TGW --> VPCC["VPC-C"]
+```
+
+You don't necessarily want to configure separate DNS infrastructure for every VPC.
+
+You can centralize Resolver infrastructure.
+
+For example:
+
+```mermaid
+flowchart TD
+    TGW["Transit Gateway"] --> VPCA["VPC-A"]
+    TGW --> VPCB["VPC-B"]
+    TGW --> VPCC["VPC-C"]
+    VPCA --> Central["Central DNS VPC"]
+    VPCB --> Central
+    VPCC --> Central
+    Central --> EP["Resolver Endpoint"] --> OnPrem["On-prem DNS"]
+```
+
+This becomes particularly useful in large AWS environments.
+
+---
+
+# 18. Centralized DNS Architecture
+
+For a large enterprise:
+
+```mermaid
+flowchart TD
+    Org["AWS ORGANIZATION"] --> TGW["Transit Gateway"]
+    TGW --> VPCA["VPC-A"]
+    TGW --> VPCB["VPC-B"]
+    TGW --> VPCC["VPC-C"]
+    VPCA --> DNSVPC["DNS VPC"]
+    VPCB --> DNSVPC
+    VPCC --> DNSVPC
+    DNSVPC --> R53["Route 53 Resolver & Resolver Rules (corp.example)"]
+    R53 --> Endpoints["Inbound/Outbound Endpoints"]
+    Endpoints <== "VPN / DX" ==> OnPrem["On-Prem DNS"]
+```
+
+This is a **High-Level Design (HLD)** pattern for larger environments.
+
+---
+
+# 19. Cost Trade-offs
+
+This is where your exam strategy becomes important.
+
+## Option 1 — Use AWS-managed Resolver
+
+```mermaid
+flowchart LR
+    VPC["VPC"] --> R53["Route 53 Resolver"]
+```
+
+### Advantages
+
+* Managed by AWS
+* No DNS servers to patch
+* Highly available service
+* Less operational work
+
+### Disadvantage
+
+* Resolver endpoints/rules incur charges
+* DNS query volume can affect cost
+
+---
+
+## Option 2 — Deploy your own DNS servers on EC2
+
+```mermaid
+flowchart LR
+    EC2["EC2"] --> BIND["BIND / Windows DNS"] --> DNS["DNS"]
+```
+
+You now have to manage:
+
+* EC2
+* OS patching
+* DNS software
+* HA
+* Scaling
+* Monitoring
+* Backup
+* Security
+* Failure recovery
+
+### Exam perspective
+
+Unless you have a specific requirement for custom DNS software:
+
+> **Prefer Route 53 Resolver.**
+
+Because it has lower operational overhead.
+
+---
+
+# 20. Operational Overhead Comparison
+
+| Architecture              |          Cost | Operational overhead | Scalability             |
+| ------------------------- | ------------: | -------------------: | ----------------------- |
+| Route 53 Resolver         |            $$ |              **Low** | High                    |
+| Self-managed DNS on EC2   |          $–$$ |             **High** | Manual                  |
+| On-prem DNS only          | Existing cost |                 High | Existing infrastructure |
+| Resolver + VPN            |            $$ |       **Low/medium** | Good                    |
+| Resolver + Direct Connect |           $$$ |               Medium | Excellent               |
+
+The exam is usually asking:
+
+> **Can AWS manage this for me?**
+
+If yes, that's often the preferred solution.
+
+---
+
+# 21. Minimum Workload / Minimum Work Principle
+
+Let's say:
+
+> "An AWS application needs to resolve `corp.example` hosted on-premises."
+
+You don't need:
+
+❌ Another DNS server in AWS  
+❌ A second DNS cluster  
+❌ Manual DNS synchronization  
+❌ Full DNS migration
+
+You can use:
+
+```mermaid
+flowchart LR
+    AWS["AWS"] --> R53["Route 53 Resolver"] --> OutboundEP["Outbound Endpoint"] --> VPN["VPN"] --> OnPrem["On-prem DNS"]
+```
+
+That's the minimum architecture that satisfies the requirement.
+
+---
+
+# 22. Another Example: On-Prem → AWS
+
+Requirement:
+
+> On-premises applications must resolve private AWS services.
+
+Minimum architecture:
+
+```mermaid
+flowchart LR
+    OnPrem["On-prem DNS"] --> Link["VPN / DX"] --> InboundEP["Route 53 Resolver Inbound Endpoint"] --> PHZ["Private Hosted Zone"] --> IP["AWS private IP"]
+```
+
+Again:
+
+**Don't deploy unnecessary DNS infrastructure.**
+
+---
+
+# 23. High Availability
+
+This is an important HLD point.
+
+Don't build:
+
+```mermaid
+flowchart LR
+    DNS["DNS"] --> EP["Resolver EP"] --> SingleAZ["One AZ only"]
+```
+
+For production, design endpoints across multiple AZs.
+
+Conceptually:
+
+```mermaid
+flowchart TD
+    VPC["VPC"] --> AZA["AZ-A Resolver Endpoint"]
+    VPC --> AZB["AZ-B Resolver Endpoint"]
+    AZA <==> OnPrem["On-prem DNS"]
+    AZB <==> OnPrem
+```
+
+This gives you AZ-level resilience.
+
+### Exam clue
+
+If the question says:
+
+> "Highly available hybrid DNS"
+
+Think:
+
+**Resolver endpoints across multiple AZs + redundant network connectivity.**
+
+---
+
+# 24. Network Connectivity HA
+
+DNS availability depends not only on Resolver but also on connectivity.
+
+For example:
+
+```mermaid
+flowchart TD
+    AWS["AWS"] --> VPNA["VPN-A"] --> OnPrem["On-prem"]
+    AWS --> VPNB["VPN-B"] --> OnPrem
+```
+
+Or:
+
+```text
+Direct Connect
+      +
+VPN backup
+```
+
+Depending on requirements.
+
+### Important exam principle
+
+> **A highly available DNS design requires highly available network connectivity too.**
+
+---
+
+# 25. Common Exam Traps
+
+### Trap 1
+
+> AWS instances need to resolve on-prem DNS names.
+
+❌ Inbound endpoint
+
+✅ **Outbound Resolver endpoint**
+
+Because the DNS query originates in AWS.
+
+---
+
+### Trap 2
+
+> On-premises clients need to resolve AWS private DNS names.
+
+❌ Outbound endpoint
+
+✅ **Inbound Resolver endpoint**
+
+Because the query enters AWS.
+
+---
+
+### Trap 3
+
+> Need DNS forwarding from AWS to corporate DNS.
+
+Think:
+
+**Outbound endpoint + forwarding rule**
+
+---
+
+### Trap 4
+
+> Need on-premises DNS to resolve private hosted-zone records.
+
+Think:
+
+**Inbound endpoint**
+
+---
+
+### Trap 5
+
+> Need a DNS server inside AWS.
+
+Don't immediately launch EC2.
+
+Ask:
+
+> **Can Route 53 Resolver satisfy the requirement?**
+
+Usually yes.
+
+---
+
+# 26. The Most Important Diagram
+
+Memorize this:
+
+```mermaid
+flowchart TD
+    subgraph AWSCloud["AWS CLOUD / VPC"]
+        EC2["EC2"] -->|"1. Query"| R53["Route 53 Resolver"]
+        R53 --> PHZ["Private Zone"]
+        R53 --> Rule["Forwarding Rule (corp.example)"]
+        Rule --> OutboundEP["Outbound Endpoint"]
+        InboundEP["Inbound Endpoint"] --> PHZ
+    end
+
+    OutboundEP <== "VPN / Direct Connect" ==> CorpDNS
+    CorpDNS <== "VPN / Direct Connect" ==> InboundEP
+
+    subgraph OnPremises["ON-PREMISES"]
+        CorpDNS["Corporate DNS<br/>10.0.0.10<br/>(corp.example)"]
+    end
+```
+
+---
+
+# 27. HLD — Small Company
+
+If the environment is small:
+
+```mermaid
+flowchart TD
+    Internet["Internet"] --> R53["Route 53 Public DNS"]
+    subgraph Net["Network Connection"]
+        VPC["AWS VPC"] <== "VPN" ==> OnPrem["On-Prem"]
+    end
+    VPC --> Resolver["Resolver"] --> OutboundEP["Outbound"] --> OnPremDNS["DNS Server"]
+```
+
+Use this when:
+
+* One/few VPCs
+* Small hybrid environment
+* Simple DNS requirements
+* Low operational complexity
+
+---
+
+# 28. HLD — Enterprise
+
+For an enterprise:
+
+```mermaid
+flowchart TD
+    AWS["AWS"] --> TGW["Transit Gateway"]
+    TGW --> VPCA["VPC-A"]
+    TGW --> VPCB["VPC-B"]
+    TGW --> VPCC["VPC-C"]
+    VPCA --> Central["Central DNS VPC"]
+    VPCB --> Central
+    VPCC --> Central
+    Central --> R53["Route 53 Resolver"]
+    R53 --> Inbound["Inbound Endpoint"]
+    R53 --> Outbound["Outbound Endpoint"]
+    Inbound <== "VPN / Direct Connect" ==> OnPrem["On-Prem DNS"]
+    Outbound <== "VPN / Direct Connect" ==> OnPrem
+```
+
+### Benefits
+
+* Centralized DNS
+* Less duplication
+* Easier management
+* Consistent forwarding rules
+* Easier scaling
+* Centralized monitoring
+
+---
+
+# 29. Alternative Services — Know When NOT to Use Them
+
+| Service                    | Use it for                       | Don't confuse it with |
+| -------------------------- | -------------------------------- | --------------------- |
+| Route 53                   | DNS management/routing           | Resolver              |
+| Route 53 Resolver          | DNS resolution                   | Hosted zone           |
+| Private Hosted Zone        | Private DNS records              | Public hosted zone    |
+| Resolver Inbound Endpoint  | On-prem → AWS DNS                | Outbound              |
+| Resolver Outbound Endpoint | AWS → on-prem DNS                | Inbound               |
+| VPN                        | Encrypted network connectivity   | DNS                   |
+| Direct Connect             | Dedicated connectivity           | DNS                   |
+| Transit Gateway            | Network connectivity/routing     | DNS                   |
+| PrivateLink                | Private service access           | DNS forwarding        |
+| CloudFront                 | Content delivery                 | DNS resolution        |
+| Global Accelerator         | Application traffic acceleration | DNS hosting           |
+
+---
+
+# 30. Exam Decision Tree
+
+When you see a hybrid DNS question:
+
+```mermaid
+flowchart TD
+    Req["DNS requirement"] --> Start{"Where does query start?"}
+    Start -->|AWS| Outbound["Outbound Endpoint"] --> Rule["Forwarding Rule"]
+    Start -->|On-prem| Inbound["Inbound Endpoint"] --> PHZ["Private Hosted Zone"]
+    Rule --> Conn{"Network connectivity"}
+    PHZ --> Conn
+    Conn -->|cheaper/quick| VPN["VPN"]
+    Conn -->|dedicated/predictable| DX["Direct Connect"]
+```
+
+---
+
+# 31. Cost + Operational Overhead Decision Matrix
+
+| Requirement                   | Best starting point | Why                      |
+| ----------------------------- | ------------------- | ------------------------ |
+| Normal VPC DNS                | Route 53 Resolver   | Managed                  |
+| AWS → on-prem DNS             | Outbound endpoint   | Minimal architecture     |
+| On-prem → AWS DNS             | Inbound endpoint    | Minimal architecture     |
+| Small hybrid network          | VPN                 | Low cost + easy          |
+| Large enterprise connectivity | Direct Connect      | Predictable performance  |
+| Many VPCs                     | Transit Gateway     | Centralized connectivity |
+| Private AWS DNS               | Private Hosted Zone | Managed DNS              |
+| Custom DNS software required  | Self-managed DNS    | Only when necessary      |
+
+---
+
+# 32. 🧠 Final Exam Cheat Sheet
+
+If you remember only this, you're in good shape:
+
+```text
+Route 53
+   ↓
+DNS service
+
+Route 53 Resolver
+   ↓
+DNS resolution
+
+Private Hosted Zone
+   ↓
+Private DNS records
+
+Inbound Resolver Endpoint
+   ↓
+ON-PREM → AWS DNS
+
+Outbound Resolver Endpoint
+   ↓
+AWS → ON-PREM DNS
+
+Resolver Rule
+   ↓
+"Send this domain to that DNS server"
+
+VPN
+   ↓
+Cheap / quick encrypted hybrid connectivity
+
+Direct Connect
+   ↓
+Dedicated / predictable hybrid connectivity
+
+Transit Gateway
+   ↓
+Many VPCs + transitive routing
+```
+
+### And your AWS exam strategy:
+
+> **1. Identify where the DNS query originates.**  
+> **2. Choose inbound or outbound Resolver.**  
+> **3. Determine whether DNS records are public, private, or on-premises.**  
+> **4. Determine the required AWS/on-prem connectivity.**  
+> **5. Prefer managed Route 53 Resolver over self-managed DNS when requirements allow.**  
+> **6. Use VPN when dedicated connectivity isn't required.**  
+> **7. Use Direct Connect when predictable dedicated connectivity is actually required.**  
+> **8. Use Transit Gateway when the network has many VPCs and needs centralized/transitive routing.**  
+> **9. For HA, distribute Resolver endpoints across AZs and provide redundant connectivity.**  
+> **10. Always choose the minimum architecture that satisfies the requirement.**
+
+**The single most important exam distinction:**
+
+> **AWS needs to resolve ON-PREM DNS → OUTBOUND Resolver endpoint.**  
+> **ON-PREM needs to resolve AWS DNS → INBOUND Resolver endpoint.**
+
+That's the pattern you should recognize immediately.

@@ -215,3 +215,24 @@ Reference:
 | **Bucket Owner Enforced** _(AWS Recommended)_ | **Disabled** (Completely ignored) | **Bucket Owner**                                                           | Bucket Policies & IAM only      |
 | **Bucket Owner Preferred**                    | Enabled                           | **Bucket Owner** (if uploaded with `bucket-owner-full-control` canned ACL) | Bucket Policy + ACLs            |
 | **Object Writer** _(Legacy Default)_          | Enabled                           | **Uploading AWS Account**                                                  | Object & Bucket ACLs + Policies |
+**Use S3 Glacier vault to store the sensitive archived data and then use a vault lock policy to enforce compliance controls**
+
+Amazon S3 Glacier is a secure, durable, and extremely low-cost Amazon S3 cloud storage class for data archiving and long-term backup. It is designed to deliver 99.999999999% durability, and provide comprehensive security and compliance capabilities that can help meet even the most stringent regulatory requirements.
+
+An S3 Glacier vault is a container for storing archives. When you create a vault, you specify a vault name and the AWS Region in which you want to create the vault. S3 Glacier Vault Lock allows you to easily deploy and enforce compliance controls for individual S3 Glacier vaults with a vault lock policy. You can specify controls such as “write once read many” (WORM) in a vault lock policy and lock the policy from future edits. Therefore, this is the correct option.
+
+Incorrect options:
+
+**Use S3 Glacier to store the sensitive archived data and then use an S3 lifecycle policy to enforce compliance controls** - You can use lifecycle policy to define actions you want Amazon S3 to take during an object's lifetime. For example, use a lifecycle policy to transition objects to another storage class, archive them, or delete them after a specified period. It cannot be used to enforce compliance controls. Therefore, this option is incorrect.
+
+**Use S3 Glacier vault to store the sensitive archived data and then use an S3 Access Control List to enforce compliance controls** - Amazon S3 access control lists (ACLs) enable you to manage access to buckets and objects. It cannot be used to enforce compliance controls. Therefore, this option is incorrect.
+
+**Use S3 Glacier to store the sensitive archived data and then use an S3 Access Control List to enforce compliance controls** - Amazon S3 access control lists (ACLs) enable you to manage access to buckets and objects. It cannot be used to enforce compliance controls. Therefore, this option is incorrect.
+
+References:
+
+[https://docs.aws.amazon.com/amazonglacier/latest/dev/working-with-vaults.html](https://docs.aws.amazon.com/amazonglacier/latest/dev/working-with-vaults.html)
+
+[https://docs.aws.amazon.com/amazonglacier/latest/dev/vault-lock.html](https://docs.aws.amazon.com/amazonglacier/latest/dev/vault-lock.html)
+
+[https://docs.aws.amazon.com/AmazonS3/latest/user-guide/create-lifecycle.html](https://docs.aws.amazon.com/AmazonS3/latest/user-guide/create-lifecycle.html)

@@ -51,6 +51,18 @@
 | **Amazon Neptune** | Fully managed graph database (Property Graph / RDF). | Queries complex networks of highly connected data (social graphs, fraud networks). | Lambda, EC2, S3, IAM. | ❌ Not for traditional tabular relational data or standard SQL queries. |
 | **Amazon Timestream** | Serverless time-series database for IoT and operational metrics. | Efficiently stores and analyzes timestamped data streams with automated lifecycle tiering. | IoT Core, Kinesis, Grafana, Lambda. | ❌ Not for general-purpose key-value lookups or relational tables. |
 
+### Amazon RDS Multi-AZ vs. Read Replicas vs. Multi-AZ + Read Replicas Comparison Matrix
+
+| Feature / Dimension | Amazon RDS Multi-AZ Deployment | Amazon RDS Read Replicas | Amazon RDS Multi-AZ + Read Replicas |
+| :--- | :--- | :--- | :--- |
+| **Primary Purpose** | **High Availability (HA) & Disaster Recovery (DR)** | **Read Performance & Horizontal Query Scaling** | **Combined HA/DR + Read Performance Scaling** |
+| **Replication Mode** | **Synchronous** (Block-level storage replication) | **Asynchronous** (Engine-level binary log replication) | **Synchronous for HA** + **Asynchronous for Read Replicas** |
+| **Standby / Target State** | **Passive Standby** in secondary AZ (Hidden DNS endpoint) | **Active Read-Only Endpoints** (1 to 15 replicas) | **Passive HA Standby** + **Active Read-Only Replicas** |
+| **Can Query Standby/Target?**| ❌ **NO** (Standby endpoint is invisible & cannot accept reads) | ✅ **YES** (Read-only SQL queries allowed) | ✅ **YES** (Queries served by Read Replicas, not HA standby) |
+| **Failover Capabilities** | **Automated (< 60s)** DNS failover to standby instance | **Manual promotion** required (can become standalone DB) | **Automated HA failover** + Read Replicas continue serving reads |
+| **Cross-Region Support** | Single Region only (across 2 AZs) | **Multi-Region supported** (Cross-Region Read Replicas) | Multi-AZ within Primary Region + Cross-Region Read Replicas |
+| **Primary Exam Trap** | ❌ **Multi-AZ does NOT scale read query performance** | ❌ **Read Replicas do NOT provide automated HA failover** | ✅ **Use for combined HA/DR + Read Scaling SLAs** |
+
 ---
 
 ## 4. Networking & Content Delivery Services
@@ -162,6 +174,8 @@
 18. **Amazon Kinesis Firehose vs Kinesis Data Streams** $\longrightarrow$ ❌ **Kinesis Firehose DOES NOT support custom interactive consumer code [KCL]** (Firehose automatically loads streaming data directly to S3/Redshift/OpenSearch; use **Kinesis Data Streams** for custom worker code).
 19. **AWS Control Tower** $\longrightarrow$ ❌ **NOT designed for single-account governance** (Control Tower automates multi-account enterprise landing zones across AWS Organizations).
 20. **Amazon Bedrock vs SageMaker** $\longrightarrow$ ❌ **Bedrock is NOT for custom ML model training from scratch** (Bedrock provides API access to serverless foundation models; use **Amazon SageMaker** for building and training custom ML models).
+21. **Amazon RDS Multi-AZ vs. Read Replicas** $\longrightarrow$ ❌ **Multi-AZ standby DOES NOT offload database read queries** (Multi-AZ is a passive synchronous failover standby for HA/DR; to scale read query performance, add **RDS Read Replicas**; for both HA + read scaling, use **RDS Multi-AZ + Read Replicas**).
+
 
 
 

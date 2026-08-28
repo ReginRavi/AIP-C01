@@ -397,6 +397,74 @@ flowchart TD
                          [ AWS Lambda Execution ]
 ```
 
-- **The account-level limit protects the AWS account.**
-- **The usage plan controls individual client tiers.**
-- **Lambda concurrency controls downstream compute execution.**
+---
+
+## 15. Real-World Exam Scenario: Securing Serverless API Gateway Endpoints (`AWS_IAM` SigV4 + AWS X-Ray Tracing vs. CORS, CloudWatch Logs & Custom Authorizer Traps)
+
+- **Scenario**: A company runs a serverless backend API using Amazon API Gateway and AWS Lambda (Python). The Solutions Architect must secure the API Gateway endpoint so **ONLY authorized IAM users or roles can access it**, and provide the ability to **inspect each request end-to-end to analyze latency and generate visual service maps**. What is the most effective solution?
+- **Architecture Solution**:
+  - Configure API Gateway method authorization to use **`AWS_IAM`**.
+  - Create IAM users/roles with `execute-api:Invoke` permissions on the API Gateway resource ARN (`arn:aws:execute-api:region:account:api-id/stage/method/path`).
+  - Require clients to sign every HTTP request using **AWS Signature Version 4 (SigV4)**.
+  - Enable **AWS X-Ray active tracing** on API Gateway and Lambda functions to generate end-to-end service maps and latency segment breakdowns.
+
+```mermaid
+flowchart TD
+    subgraph Client ["1. Authorized Client Tier"]
+        IAM_Caller["IAM User / Role Credentials"]
+        SigV4["AWS Signature Version 4 (SigV4)<br/>🔑 Request Signed with Access Key / Secret Key"]
+
+        IAM_Caller ==> SigV4
+    end
+
+    subgraph APIGW_Tier ["2. API Gateway Authorization Tier"]
+        APIGW["Amazon API Gateway REST API"]
+        IAM_Auth{"AWS_IAM Authorization Check"}
+        PolicyCheck["Verify execute-api:Invoke Policy"]
+
+        SigV4 ==>|"Signed HTTP Request"| APIGW ==> IAM_Auth ==> PolicyCheck
+    end
+
+    subgraph Compute_Storage ["3. Backend Compute & Storage Tier"]
+        Lambda["AWS Lambda Function (Python)"]
+        DDB[("Amazon DynamoDB")]
+
+        PolicyCheck ==>|"Passed"| Lambda ==> DDB
+    end
+
+    subgraph Observability ["4. Distributed Tracing & Service Map Tier"]
+        XRay["AWS X-Ray Service Engine<br/>📊 Generates Visual Service Map<br/>⏱️ End-to-End Request & Component Latency Trace"]
+
+        APIGW -.->|"Send Trace Segments"| XRay
+        Lambda -.->|"Send Subsegment Logs"| XRay
+        DDB -.->|"Send Subsegment Logs"| XRay
+    end
+
+    classDef client fill:#fff3cd,stroke:#ffc107,stroke-width:1px;
+    classDef apigw fill:#7950f2,stroke:#5f3dc4,color:#ffffff;
+    classDef backend fill:#2b8a3e,stroke:#1e632b,color:#ffffff;
+    classDef xray fill:#d1ecf1,stroke:#17a2b8,stroke-width:2px;
+
+    class IAM_Caller,SigV4 client;
+    class APIGW,IAM_Auth,PolicyCheck apigw;
+    class Lambda,DDB backend;
+    class XRay xray;
+```
+
+### Key Technical Rationale:
+1. **Native `AWS_IAM` Authorization with AWS SigV4**:
+   - Setting API Gateway method authorization to `AWS_IAM` requires callers to sign API requests using **AWS Signature Version 4 (SigV4)**.
+   - Access control is governed strictly by standard IAM policies containing the `execute-api:Invoke` action on the target API Gateway resource ARN (`arn:aws:execute-api:region:account:api-id/stage/method/path`).
+2. **AWS X-Ray for Service Maps & End-to-End Latency Tracing**:
+   - AWS X-Ray natively integrates with API Gateway and Lambda to collect trace segments across distributed components. It aggregates subsecond latency breakdown graphs and generates **visual service maps** illustrating overall application health.
+
+### Why Distractor Options Fail:
+- *CORS `Access-Control-Allow-Origin` + CloudWatch Logs*:
+  - **CORS is NOT Authorization**: CORS is a browser-side cross-origin policy; it does NOT authenticate or restrict access to IAM users/roles.
+  - **CloudWatch Logs vs. Service Maps**: CloudWatch Logs captures text execution logs; it cannot generate visual service maps or distributed trace graphs across services.
+- *Custom Lambda Authorizer validating raw Access Key / Secret Key*:
+  - **Security Anti-Pattern**: Transmitting raw AWS Secret Access Keys in plain HTTP request headers is a severe security risk! Native `AWS_IAM` authorization uses SigV4 to sign requests cryptographically without exposing secret keys over the wire.
+- *API Gateway Client Certificates + CloudWatch Logs*:
+  - **Origin Authentication vs. Client Auth**: Client certificates allow downstream HTTP backend servers (e.g. EC2) to verify requests originated from API Gateway. Client certificates do NOT authenticate IAM users or evaluate `execute-api:Invoke` permissions.
+
+---

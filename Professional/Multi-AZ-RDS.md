@@ -194,6 +194,29 @@ flowchart TD
 
 ---
 
+## 6.1 Real-World Exam Scenario: RDS Multi-AZ Automatic Failover DNS Mechanics (CNAME Flip vs. IP Address Switch & Standby Creation Traps)
+
+- **Scenario**: A web application relies on an Amazon RDS database deployed in a Multi-AZ configuration. During a scheduled maintenance window, the operating system of the primary DB instance undergoes software patching, which triggers an automatic failover. What happens to the database during failover?
+- **Architecture Solution**:
+  - The **Canonical Name Record (CNAME)** for the RDS DB endpoint is altered to point from the primary database instance to the newly promoted standby database instance.
+
+### Key Technical Rationale:
+1. **CNAME DNS Endpoint Redirection**:
+   - Applications connect to Amazon RDS using a single endpoint DNS hostname (e.g. `mydb.c1234567890.us-east-1.rds.amazonaws.com`).
+   - During failover (triggered by OS patching, primary DB hardware failure, or AZ outage), Amazon RDS updates the **CNAME DNS record** in Route 53 to point to the IP address of the pre-provisioned standby DB instance in the second AZ.
+   - Applications seamlessly reconnect to the promoted standby database using the exact same DNS endpoint string.
+
+### Why Distractor Options Fail:
+- *Switching the IP Address of the primary DB instance to the standby DB instance*:
+  - **IP Address Isolation**: Private IP addresses are bound to specific Elastic Network Interfaces (ENIs) inside their respective AZ subnets and **cannot be transferred across Availability Zones**. Only the **DNS CNAME record** is updated to point to the standby instance's IP address.
+- *Creating a new DB instance to replace the primary database*:
+  - **Pre-Provisioned Standby**: The standby DB instance is already provisioned and kept continuously up to date via **synchronous block-level replication**. No new DB instance needs to be created during failover.
+- *The RDS DB instance will automatically reboot*:
+  - **Failover Promotion**: Failover promotes the pre-existing passive standby instance to become the active primary writer; it does not simply reboot the primary instance.
+
+---
+
+
 ## 7. AWS RDS Deployment Selection Decision Tree
 
 ```mermaid

@@ -275,6 +275,65 @@ Result: Account protected, premium clients prioritized, operational overhead min
 
 ---
 
+## 13.1 Real-World Exam Scenario: Decoupling Smart Meter High-Volume Telemetry via API Gateway + Kinesis Batching & DynamoDB WCU Scaling (Select TWO)
+
+- **Scenario**: Electric smart meters send telemetry every 5 minutes to API Gateway $\rightarrow$ AWS Lambda $\rightarrow$ Amazon DynamoDB. Due to new metrics and customer growth, Lambda processing time ballooned from 5-10s to 60-90s. Errors began appearing: `TooManyRequestsException` on AWS Lambda and `ProvisionedThroughputExceededException` on DynamoDB `PutItem` operations. Which TWO actions resolve these issues?
+- **Architecture Solutions (Select TWO)**:
+  1. **Decouple & Batch via Kinesis**: Stream incoming API Gateway requests into an **Amazon Kinesis Data Stream**. Configure Lambda to read records from Kinesis in **batches**, dramatically reducing function invocations and optimizing DynamoDB writes.
+  2. **Increase DynamoDB Write Capacity**: Increase the **Write Capacity Units (WCU)** of the DynamoDB table (or switch to On-Demand capacity) to accommodate the write throughput required by the Lambda functions.
+
+```mermaid
+flowchart TD
+    subgraph Meters ["1. Smart Meter Telemetry Fleet"]
+        Devices["Thousands of Smart Meters<br/>⚡ Sends Metrics Every 5 Minutes"]
+    end
+
+    subgraph API_Ingest ["2. API Gateway Ingestion Tier"]
+        APIGW["Amazon API Gateway<br/>🌐 Receives High-Volume Inbound Payloads"]
+    end
+
+    subgraph Buffer_Layer ["3. Streaming Buffer Layer"]
+        Kinesis["Amazon Kinesis Data Streams<br/>📦 Buffers Telemetry & Prevents Concurrency Exhaustion"]
+    end
+
+    subgraph ServerlessBatch ["4. Batch Compute & Storage Layer"]
+        Lambda["AWS Lambda Functions<br/>⚡ Processes Data in Batches (e.g., 100 items/batch)<br/>(Eliminates TooManyRequestsException)"]
+        DynamoDB[("Amazon DynamoDB Table<br/>💾 Scaled Write Capacity Units (WCU)<br/>(Eliminates ProvisionedThroughputExceededException)")]
+
+        Lambda ==>|"BatchWriteItem"| DynamoDB
+    end
+
+    Devices ==>|"HTTP POST"| APIGW
+    APIGW ==>|"1. Direct Kinesis Integration"| Kinesis
+    Kinesis ==>|"2. Batch Event Source Mapping"| Lambda
+
+    classDef device fill:#fff3cd,stroke:#ffc107,stroke-width:1px;
+    classDef buffer fill:#7950f2,stroke:#5f3dc4,color:#ffffff;
+    classDef db fill:#2b8a3e,stroke:#1e632b,color:#ffffff;
+
+    class Devices device;
+    class APIGW,Kinesis buffer;
+    class Lambda,DynamoDB db;
+```
+
+### Key Technical Rationale:
+1. **Streaming Buffer (Kinesis) for Batch Processing**:
+   - Long-running Lambda invocations (60-90 seconds) consume reserved/unreserved concurrency slots, causing `TooManyRequestsException`.
+   - Ingesting payloads into **Amazon Kinesis Data Streams** decouples API Gateway from Lambda. Lambda reads records in batches, executing far fewer invocations and using `BatchWriteItem` to optimize DynamoDB storage writes.
+2. **Scaling DynamoDB Write Throughput (WCU)**:
+   - `ProvisionedThroughputExceededException` is a direct signal from DynamoDB that write throughput exceeds provisioned capacity. Increasing Write Capacity Units (WCU) resolves table throttling.
+
+### Why Distractor Options Fail:
+- *Modifying API Gateway Stage Throttling Limits (Your Selection)*:
+  - **Downstream Distractor**: The errors (`TooManyRequestsException` and `ProvisionedThroughputExceededException`) occur downstream in **Lambda** and **DynamoDB**, NOT at the API Gateway tier. Raising API Gateway stage throttling limits passes even *more* unbuffered traffic downstream, worsening Lambda concurrency crashes!
+- *Increasing Lambda Memory Allocation*:
+  - Adjusting memory increases CPU, but performance gains plateau and costs surge. It does NOT buffer incoming spikes, implement batching, or resolve DynamoDB `ProvisionedThroughputExceededException`.
+- *Increasing Smart Meter Payload & Reducing Frequency*:
+  - Exceeds the API Gateway 10 MB payload limit and requires modifying firmware/code across thousands of physical deployed smart meters.
+
+---
+
+
 ## 12. Exam Troubleshooting Decision Tree
 
 Use this decision logic when evaluating serverless throttling questions on the AWS SAP-C02 or AIP-C01 exams:

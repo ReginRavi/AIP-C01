@@ -45,6 +45,7 @@
 | :--- | :--- | :--- | :--- | :--- |
 | **Amazon RDS** | Managed relational database (MySQL, Postgres, MariaDB, Oracle, SQL Server). | Automates OS patching, DB backups, multi-AZ failover, and hardware management. | EC2, Secrets Manager, KMS, CloudWatch, Direct Connect. | ❌ **Multi-AZ Standby is PASSIVE** (Cannot be queried for read scaling; use Read Replicas). |
 | **Amazon Aurora** | Cloud-native relational database (MySQL & PostgreSQL compatible). | Delivers up to 5x MySQL performance with storage auto-scaling up to 128 TiB. | Aurora Global Database, Aurora Serverless v2, Secrets Manager. | ❌ **Not multi-master across regions** (Aurora Global DB has 1 Primary Writer + Regional Readers). |
+| **Amazon Aurora Global Database** | Multi-Region relational database for cross-region DR and global low-latency reads. | Enables dedicated physical storage-layer replication across regions with RPO < 1s and sub-minute regional failover (RTO < 1m). | Amazon Aurora, Route 53 Failover Routing, AWS KMS, Secrets Manager. | ❌ **NOT multi-master write across regions** (1 Primary Writer Region + Up to 5 Secondary Regions). ❌ **RDS Multi-AZ cannot span regions** (Multi-AZ is single-region only). |
 | **Amazon DynamoDB** | Fully managed serverless key-value NoSQL database. | Guarantees single-digit millisecond latency at any scale without server management. | DynamoDB Global Tables, DAX, DynamoDB Streams, Lambda. | ❌ **NOT for complex multi-table SQL joins or ACID OLAP analytics** (Use Redshift/RDS). |
 | **Amazon ElastiCache** | In-memory key-value cache engine (Redis / Memcached). | Offloads read pressure from databases and reduces application response latency to sub-ms. | RDS, Aurora, DynamoDB, EC2, AWS Lambda. | ❌ **Memcached does NOT support multi-AZ failover or persistence** (Use Redis for HA/Persistence). |
 | **Amazon Redshift** | Fully managed petabyte-scale columnar Data Warehouse (OLAP). | Executes complex analytical queries and aggregations across massive datasets. | S3, AWS Glue, QuickSight, DMS, EMR. | ❌ **NOT for high-frequency OLTP transactional writes** (Frequent small writes degrade performance). |
@@ -62,6 +63,18 @@
 | **Failover Capabilities** | **Automated (< 60s)** DNS failover to standby instance | **Manual promotion** required (can become standalone DB) | **Automated HA failover** + Read Replicas continue serving reads |
 | **Cross-Region Support** | Single Region only (across 2 AZs) | **Multi-Region supported** (Cross-Region Read Replicas) | Multi-AZ within Primary Region + Cross-Region Read Replicas |
 | **Primary Exam Trap** | ❌ **Multi-AZ does NOT scale read query performance** | ❌ **Read Replicas do NOT provide automated HA failover** | ✅ **Use for combined HA/DR + Read Scaling SLAs** |
+
+### Amazon Aurora Global Database vs. RDS Cross-Region Read Replicas vs. RDS Multi-AZ (Disaster Recovery & Replication Matrix)
+
+| Feature / Dimension | Amazon Aurora Global Database | RDS Cross-Region Read Replicas | RDS Multi-AZ Deployment |
+| :--- | :--- | :--- | :--- |
+| **Primary Purpose** | **Cross-Region Disaster Recovery (RPO < 1s, RTO < 1m) & Global Read Scaling** | **Cross-Region Read Scaling & Asynchronous Cross-Region DR** | **Single-Region High Availability (HA) & Automated Failover** |
+| **Replication Architecture** | **Dedicated Physical Storage-Layer Replication** (No DB engine performance impact) | **Engine-Level Asynchronous Replication** (MySQL/PostgreSQL Binlogs) | **Synchronous Block-Level Storage Replication** (Between 2 AZs in 1 Region) |
+| **Cross-Region RPO (Data Loss)** | **Sub-Second (Typically < 1 second)** | **Seconds to Minutes** (Subject to replication lag & network congestion) | ❌ **N/A** (Single Region Only — Zero Cross-Region Protection!) |
+| **Cross-Region RTO (Downtime)** | **Sub-Minute (< 1 minute promotion)** | **Minutes to Hours** (Manual promotion + instance reboot required) | ❌ **N/A** (Single Region Only — Zero Cross-Region Protection!) |
+| **Write / Read Architecture** | **1 Primary Region Writer** + Up to **5 Secondary Regions** (16 Replicas per Region) | **1 Primary Region Master** + Up to **5 Cross-Region Read Replicas** | **1 Active Writer** + **1 Passive Synchronous Standby** (No reads on standby) |
+| **Failover Mechanism** | **Managed Regional Failover / Promotion** (Secondary Region promoted to Primary Writer) | **Manual Read Replica Promotion** (Requires re-routing app connections) | **Automated DNS CNAME Flip** (< 60s failover to standby in same Region) |
+| **Primary Exam Trap Trigger** | ❌ **Do NOT assume Multi-AZ or RDS Replicas satisfy RPO < 1 min & RTO < 5 mins for Cross-Region DR** | ❌ **Manual promotion & DB reboots break strict < 1m RTO SLAs under heavy load** | ❌ **RDS Multi-AZ provides ZERO protection against regional AWS outages!** |
 
 ---
 
@@ -165,7 +178,19 @@
 | **6. Retire** | Decommission obsolete or unused applications | Zero (Turned off completely) | N/A (Decommissioning) | *"System no longer used or provides zero business value"* |
 | **7. Retain** | Keep applications on-premises without migrating | High (On-prem legacy) | N/A (Stay on-prem) | *"Strict compliance, specialized hardware, or recent upgrade on-prem"* |
 
+### AWS Deployment Strategies & Elastic Beanstalk Policies Comparison Matrix
+
+| Deployment Strategy / Policy | Target Infrastructure / Service | Downtime Impact | Capacity Impact During Deployment | Rollback Speed & Mechanics | Primary Exam Keyword Trigger |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **All-at-Once** | EC2, Elastic Beanstalk, CodeDeploy | 🔴 **100% Downtime** (All instances updated simultaneously) | 🔴 **0% Capacity** (All instances taken out of service during update) | 🔴 **Slow** (Requires re-deploying previous application version bundle) | *"Fastest deployment / Lowest infrastructure cost / Downtime acceptable"* |
+| **Rolling** | EC2, Elastic Beanstalk, CodeDeploy | 🟡 **Zero Downtime** | 🟡 **Reduced Capacity** (Instance batches taken out of service sequentially; e.g. 50% capacity during 2-batch update) | 🟡 **Slow to Moderate** (Requires rolling back updated batches sequentially) | *"Gradually update instances in batches / Zero extra infrastructure cost"* |
+| **Rolling with Additional Batch** | EC2, Elastic Beanstalk | 🟢 **Zero Downtime** | 🟢 **100% Full Capacity Maintained** (Launches 1 extra instance batch before taking instances out of service) | 🟡 **Moderate** (Rolls back updated instances in batches) | *"Maintain 100% full capacity without launching a full duplicate environment"* |
+| **Immutable** | EC2, Elastic Beanstalk | 🟢 **Zero Downtime** | 🟢 **100% Full Capacity Maintained** (Launches a full temporary parallel ASG fleet alongside running fleet) | 🟢 **Instant** (Terminates temporary ASG fleet if health checks fail; original fleet untouched) | *"Prevent failed deployments / Strictly maintain 100% full compute capacity without reduction / Prevent configuration drift"* |
+| **Blue/Green** | EC2, ECS, CodeDeploy, Beanstalk | 🟢 **Zero Downtime** | 🟢 **100% Full Capacity Maintained** (Spins up complete parallel Green environment) | 🟢 **Instant** (Switches DNS or ALB target group back to Blue environment) | *"Zero downtime / Instant rollback / Pre-test Green environment before traffic cutover"* |
+| **Canary** | Lambda, ECS, CodeDeploy | 🟢 **Zero Downtime** | 🟢 **100% Full Capacity Maintained** (Gradually shifts small % traffic e.g. 10% to new version) | 🟢 **Fast** (Reverts traffic percentage shift if CloudWatch Alarms trigger) | *"Shift small percentage of traffic / Minimize blast radius on new releases"* |
+
 ---
+
 
 ## 8. Machine Learning & Specialized AI Services
 
@@ -253,48 +278,8 @@
 64. **Dual Origin CloudFront Restriction for Static S3 & Dynamic ALB (OAC + Custom Header AWS WAF on ALB vs. NACLs & WAF on CloudFront Traps — Select TWO)** $\longrightarrow$ ❌ **Do NOT attach AWS WAF Web ACLs checking custom headers to CloudFront or use subnet NACLs for ALB restriction** (Attaching a Web ACL requiring a custom header to CloudFront blocks public end-users at the edge before CloudFront ever injects the origin custom header! Hardcoding dynamic CloudFront IPs into subnet NACLs is unmaintainable. To restrict access to CloudFront ONLY: 1. Use **Origin Access Control (OAC)** for private S3 origins, and 2. Configure CloudFront **Origin Custom Headers** and attach an **AWS WAF Web ACL to the Application Load Balancer (ALB)** to deny requests missing the secret header).
 65. **Zero-Code-Modification MongoDB & Java Migration (Multi-AZ EC2 ASG + Multi-AZ Amazon DocumentDB vs. Aurora, DynamoDB & Single-AZ Traps)** $\longrightarrow$ ❌ **Do NOT select Amazon Aurora, Amazon DynamoDB, or single-AZ DocumentDB when migrating MongoDB without application code changes** (Migrating NoSQL MongoDB to Aurora [relational SQL] or DynamoDB [different SDK/API] requires rewriting database drivers and queries, violating zero-code-modification constraints. Single-AZ DocumentDB fails database high availability requirements. To migrate an unmodifiable Java + MongoDB workload with Multi-AZ high availability: 1. Deploy the Java app on **Amazon EC2 instances in an Auto Scaling Group spanning multiple AZs**, and 2. Migrate MongoDB to **Amazon DocumentDB (with MongoDB compatibility) across multiple AZs**).
 66. **Cost-Optimized Queue Processing & Cold Archival (SQS-Based EC2 Spot ASG + Amazon Glacier vs. SNS, S3 Standard-IA & Standalone CloudWatch Traps)** $\longrightarrow$ ❌ **Do NOT select Amazon SNS for queue processing, S3 Standard-IA for tape replacement, or standalone CloudWatch alarms to kill instances** (Amazon SNS is a push notification service and cannot queue/buffer job messages for worker polling. S3 Standard-IA [$0.0125/GB-mo] is designed for active infrequent data, NOT cold tape library replacement. Standalone CloudWatch alarms terminating instances break ASG health check management. To replicate an on-premises queue-to-tape media processing pipeline at minimum cost: 1. Scale an **Auto Scaling Group of EC2 Spot Instances based on SQS queue depth**, and 2. Archive processed data to **Amazon S3 Glacier / Glacier Deep Archive** [$0.004/GB-mo]).
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+67. **Sub-Second RPO & Sub-5-Minute RTO Cross-Region DB Disaster Recovery (Aurora Global Database + Route 53 Failover vs. RDS Multi-AZ & Read Replica Traps)** $\longrightarrow$ ❌ **Do NOT select RDS Multi-AZ, standard RDS cross-region read replicas, or snapshot restores for cross-region disaster recovery targets (RPO < 1 min / RTO < 5 mins)** (RDS Multi-AZ operates strictly within a single AWS Region across AZs and provides ZERO protection against regional outages. Standard RDS cross-region read replicas use asynchronous binlog replication requiring manual promotion and database reboots that break strict RTO/RPO SLAs. To achieve sub-second RPO [< 1s] and sub-minute RTO [< 1m] cross-region disaster recovery with low operational overhead: 1. Migrate database workloads to an **Amazon Aurora Global Database** [Primary in active region, Secondary in DR region], and 2. Configure **Amazon Route 53 DNS entry with health checks and a Failover Routing Policy**).
+68. **Full Capacity & Zero Downtime Enterprise Deployment (Elastic Beanstalk Immutable Policy + CodeDeploy Blue/Green vs. All-at-Once, Rolling & Lightsail Traps)** $\longrightarrow$ ❌ **Do NOT select Elastic Beanstalk All-at-Once, Rolling, or Amazon Lightsail when deployments must strictly maintain 100% full compute capacity without reduction** (All-at-Once takes all running instances down simultaneously, causing 100% downtime. Rolling deployments update instances in batches, taking each batch out of service sequentially and reducing overall compute capacity. Amazon Lightsail is for simple Dev/Test workloads, lacking enterprise deployment controls. To achieve zero downtime and guarantee zero compute capacity reduction during deployments: 1. Host web apps in **AWS Elastic Beanstalk with the deployment policy set to `Immutable`** [which launches a temporary parallel ASG fleet alongside the running fleet], 2. Provision serverless/DB resources via **AWS CloudFormation**, and 3. Manage cutovers via **AWS CodeDeploy Blue/Green**).
+69. **Provisioning Developer Access via Least Privilege (`PowerUserAccess` AWS Managed Policy vs. `AdministratorAccess` & `SystemAdministrator` Traps)** $\longrightarrow$ ❌ **Do NOT attach `AdministratorAccess` or `SystemAdministrator` managed policies when provisioning developer team access** (`AdministratorAccess` grants full unrestricted administrative rights [`Action: "*", Resource: "*"`] including IAM policy editing and Organizations management account changes, severely violating least privilege. `SystemAdministrator` lacks the required AWS Organizations read permissions to view organization limits and management account details. To provision application developer access with least privilege while allowing developers to view organization details, attach the **`PowerUserAccess` AWS managed policy** [which uses `NotAction: ["iam:*", "organizations:*"]` while explicitly granting read-only access to AWS Organizations]).
 
 

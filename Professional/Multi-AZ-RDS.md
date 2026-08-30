@@ -216,6 +216,54 @@ flowchart TD
 
 ---
 
+## 6.2 Real-World Exam Scenario 2: Achieving Strict RTO (< 2 Hours) & RPO (<= 10 Mins) for Regional Disaster Recovery (Hourly S3 Full Backups + 5-Min Transaction Logs + Cross-Region Replication vs. Multi-AZ, Glacier & EBS Traps)
+
+- **Scenario**: An online credit application system running across multiple Availability Zones in `ap-southeast-2` experienced a database incident at 12:00 PM. Transactions from 10:30 AM onwards were lost (90-minute data loss), breaching the company's Disaster Recovery Plan targets of **RTO < 2 hours** and **RPO <= 10 minutes**. How can the solutions architect modify the architecture to achieve RTO < 2 hours and RPO <= 10 minutes during a system or regional outage?
+- **Architecture Solution**:
+  - Create **database backups every hour** and store them in an **Amazon S3 bucket with Cross-Region Replication (CRR)** enabled.
+  - Store **transaction logs in the same S3 bucket every 5 minutes**.
+
+```mermaid
+flowchart TD
+    subgraph PrimaryRegion ["1. Primary AWS Region (ap-southeast-2)"]
+        PrimaryDB["Production Database Cluster<br/>(Online Loan System)"]
+        PrimaryS3[("Primary S3 Bucket<br/>📦 Hourly Full Backups<br/>📜 5-Minute Transaction Logs")]
+
+        PrimaryDB ==>|"Hourly Snapshot"| PrimaryS3
+        PrimaryDB ==>|"5-Min Log Shipping"| PrimaryS3
+    end
+
+    subgraph SecondaryDRRegion ["2. Secondary AWS DR Region"]
+        CRR["S3 Cross-Region Replication (CRR)<br/>⚡ Automatic Asynchronous Object Replication"]
+        SecondaryS3[("Secondary S3 Bucket (DR Region)<br/>📦 Restorable Backups & Logs")]
+        SecondaryDB["DR Restored Database<br/>⏱️ RPO <= 5 mins | RTO < 2 hours"]
+
+        PrimaryS3 ==> CRR ==> SecondaryS3
+        SecondaryS3 -.->|"Rapid Restores on Failover"| SecondaryDB
+    end
+
+    classDef primary fill:#fff3cd,stroke:#ffc107,stroke-width:1px;
+    classDef secondary fill:#2b8a3e,stroke:#1e632b,color:#ffffff;
+
+    class PrimaryDB,PrimaryS3 primary;
+    class CRR,SecondaryS3,SecondaryDB secondary;
+```
+
+### Key Technical Rationale:
+1. **5-Minute Transaction Log Shipping for RPO <= 10 Minutes**:
+   - Shipping database transaction logs every 5 minutes ensures that the maximum potential data loss is strictly capped at **5 minutes**, easily satisfying the RPO <= 10-minute SLA requirement.
+2. **S3 Standard Storage + Cross-Region Replication (CRR) for RTO < 2 Hours**:
+   - Storing hourly backups and 5-minute transaction logs in S3 Standard with CRR automatically replicates data to a secondary AWS Region. S3 Standard allows immediate file downloads to rebuild database instances in the secondary DR region within 2 hours, even if the primary region suffers a complete outage.
+
+### Why Distractor Options Fail:
+- *Synchronous Multi-AZ Source-Replica Replication Alone (Your Selection)*:
+  - **Single-Region Regional Outage Vulnerability**: Multi-AZ synchronous replication only protects against single Availability Zone hardware failures. If an outage strikes the entire AWS Region (`ap-southeast-2`), both primary and standby AZ instances become completely unreachable. It does NOT satisfy cross-region DR requirements.
+- *Store Database Backups in S3 Glacier for Archiving*:
+  - **Glacier Retrieval Delay Violates RTO**: Restoring data from S3 Glacier (Flexible Retrieval or Deep Archive) takes 3 to 12+ hours. Restoring from Glacier will breach the strictly mandated **RTO < 2 hours** target.
+- *Perform Database Backups to Amazon EBS Volumes*:
+  - **Single-Region Storage & Restores Complexity**: EBS volume backups remain in a single region. Replicating and restoring EBS volumes across regions increases complexity and risks breaching the 2-hour RTO target.
+
+---
 
 ## 7. AWS RDS Deployment Selection Decision Tree
 

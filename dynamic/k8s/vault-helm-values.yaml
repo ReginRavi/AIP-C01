@@ -1,0 +1,52 @@
+# Production-grade Helm values for HashiCorp Vault on Kubernetes
+# Aligned with ICICT 2025 Paper Section III (Proposed Framework)
+
+global:
+  enabled: true
+  tlsDisable: false
+
+injector:
+  enabled: true
+  replicas: 2
+  logLevel: "info"
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 250m
+
+server:
+  enabled: true
+  image:
+    repository: "hashicorp/vault"
+    tag: "1.16.0"
+  
+  # High-Availability Raft consensus storage engine
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+        service_registration "kubernetes" {}
+
+  auditStorage:
+    enabled: true
+    size: 10Gi
+    mountPath: "/vault/logs"
+
+ui:
+  enabled: true
+  serviceType: "ClusterIP"

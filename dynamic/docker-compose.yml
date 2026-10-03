@@ -1,0 +1,97 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. PostgreSQL Relational Database (Target Managed Endpoint)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: dynamic-poc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecommerce_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: MasterRootPasswordDoNotExpose999!
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ecommerce_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # 2. HashiCorp Vault Server
+  # ---------------------------------------------------------------------------
+  vault:
+    image: hashicorp/vault:1.16.0
+    container_name: dynamic-poc-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./vault/policies:/vault/policies:ro
+      - ./vault/scripts:/vault/scripts:ro
+      - vaultlogs:/vault/logs
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # 3. Automated Vault Setup & Policy Provisioner
+  # ---------------------------------------------------------------------------
+  vault-provisioner:
+    image: hashicorp/vault:1.16.0
+    container_name: dynamic-poc-provisioner
+    depends_on:
+      vault:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "root"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "ecommerce_db"
+    volumes:
+      - ./vault/scripts:/vault/scripts:ro
+      - ./vault/policies:/vault/policies:ro
+    entrypoint: ["/bin/sh", "/vault/scripts/configure-vault.sh"]
+
+  # ---------------------------------------------------------------------------
+  # 4. Cloud Microservice (Payment Gateway)
+  # ---------------------------------------------------------------------------
+  payment-service:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: dynamic-poc-payment-app
+    restart: unless-stopped
+    depends_on:
+      vault-provisioner:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "root"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_NAME: "ecommerce_db"
+      DYNAMIC_ROLE_PATH: "database/creds/payment-service-role"
+
+volumes:
+  pgdata:
+  vaultlogs:

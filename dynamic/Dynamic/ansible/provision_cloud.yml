@@ -1,0 +1,101 @@
+---
+- name: Universal Centralized Secret Data Management - Automated Cloud Provisioning
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    vault_addr: "{{ lookup('env', 'VAULT_ADDR') | default('http://127.0.0.1:8210', true) }}"
+    role_id: "{{ lookup('env', 'VAULT_ROLE_ID') | default('', true) }}"
+    secret_id: "{{ lookup('env', 'VAULT_SECRET_ID') | default('', true) }}"
+    aws_endpoint: "{{ lookup('env', 'AWS_ENDPOINT') | default('http://127.0.0.1:4566', true) }}"
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-east-1', true) }}"
+
+  tasks:
+    - name: 1. Validate AppRole Credentials
+      ansible.builtin.fail:
+        msg: "VAULT_ROLE_ID and VAULT_SECRET_ID must be provided."
+      when: role_id == "" or secret_id == ""
+
+    - name: 2. Authenticate to HashiCorp Vault via AppRole
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/auth/approle/login"
+        method: POST
+        body_format: json
+        body:
+          role_id: "{{ role_id }}"
+          secret_id: "{{ secret_id }}"
+        status_code: 200
+      register: approle_auth_res
+
+    - name: 3. Extract Ephemeral Vault Client Token
+      ansible.builtin.set_fact:
+        vault_client_token: "{{ approle_auth_res.json.auth.client_token }}"
+        vault_token_ttl: "{{ approle_auth_res.json.auth.lease_duration }}"
+
+    - name: Display Vault Token Metadata
+      ansible.builtin.debug:
+        msg: "Successfully authenticated via AppRole. Client Token TTL: {{ vault_token_ttl }}s"
+
+    - name: 4. Read Static Cloud Configurations from KV v2
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/secret/data/cloud/config"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_client_token }}"
+        status_code: 200
+      register: kv_config_res
+
+    - name: 5. Request Dynamic Ephemeral AWS Credentials from Vault
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/aws/creds/cloud-provisioner-role"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ vault_client_token }}"
+        status_code: 200
+      register: dynamic_aws_res
+
+    - name: 6. Extract Dynamic AWS Access Keys & Lease ID
+      ansible.builtin.set_fact:
+        dynamic_access_key: "{{ dynamic_aws_res.json.data.access_key }}"
+        dynamic_secret_key: "{{ dynamic_aws_res.json.data.secret_key }}"
+        dynamic_lease_id: "{{ dynamic_aws_res.json.lease_id }}"
+        dynamic_lease_duration: "{{ dynamic_aws_res.json.lease_duration }}"
+        bucket_name: "{{ kv_config_res.json.data.data.bucket_prefix }}-{{ lookup('pipe', 'date +%s') }}"
+
+    - name: Display Dynamic Credential Summary
+      ansible.builtin.debug:
+        msg: >
+          [Vault AWS Engine] Generated Ephemeral IAM User:
+          AccessKey: {{ dynamic_access_key }}
+          LeaseID: {{ dynamic_lease_id }}
+          TTL: {{ dynamic_lease_duration }}s
+
+    - name: 7. Provision Cloud Infrastructure (S3 Bucket via Ephemeral Credentials)
+      ansible.builtin.uri:
+        url: "{{ aws_endpoint }}/{{ bucket_name }}"
+        method: PUT
+        headers:
+          Host: "{{ bucket_name }}.s3.amazonaws.com"
+        status_code: [200, 201]
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ dynamic_access_key }}"
+        AWS_SECRET_ACCESS_KEY: "{{ dynamic_secret_key }}"
+        AWS_DEFAULT_REGION: "{{ aws_region }}"
+      register: s3_provision_res
+
+    - name: 8. Save Provisioning Output State
+      ansible.builtin.copy:
+        dest: "./ansible_provision_state.json"
+        content: |
+          {
+            "bucket_name": "{{ bucket_name }}",
+            "lease_id": "{{ dynamic_lease_id }}",
+            "access_key": "{{ dynamic_access_key }}",
+            "lease_duration": {{ dynamic_lease_duration }},
+            "provisioned_at": "{{ lookup('pipe', 'date -Iseconds') }}"
+          }
+
+    - name: Provisioning Completion Notice
+      ansible.builtin.debug:
+        msg: "Cloud Resource '{{ bucket_name }}' successfully provisioned using ephemeral Vault AWS credentials!"

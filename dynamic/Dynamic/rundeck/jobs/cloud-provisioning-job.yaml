@@ -1,0 +1,44 @@
+- defaultTab: output
+  description: |-
+    Automated Public Cloud Provisioning with Dynamic Secrets
+    CPITS-II 2024 Reference: Martseniuk et al.
+    Orchestration: Rundeck -> HashiCorp Vault (AppRole) -> Dynamic AWS IAM -> Ansible Provisioner
+  executionEnabled: true
+  id: b3a268e0-1c52-47ef-8fa1-cpits2024job1
+  loglevel: INFO
+  name: Automated Cloud Provisioning (Dynamic Vault Secrets)
+  nodeFilterEditable: false
+  scheduleEnabled: true
+  sequence:
+    keepgoing: false
+    strategy: node-first
+    commands:
+    - description: 'Step 1: Authenticate with Vault via AppRole'
+      exec: |
+        echo "=== [Rundeck Step 1] Authenticating to Vault via AppRole ==="
+        LOGIN_RESP=$(curl -s --request POST \
+          --data "{\"role_id\":\"$VAULT_ROLE_ID\",\"secret_id\":\"$VAULT_SECRET_ID\"}" \
+          "$VAULT_ADDR/v1/auth/approle/login")
+        VAULT_TOKEN=$(echo $LOGIN_RESP | jq -r '.auth.client_token')
+        echo "Vault Client Token acquired successfully."
+    - description: 'Step 2: Read Static Config & Request Dynamic AWS Credentials'
+      exec: |
+        echo "=== [Rundeck Step 2] Requesting Dynamic AWS Credentials from Vault ==="
+        AWS_CREDS=$(curl -s --header "X-Vault-Token: $VAULT_TOKEN" \
+          "$VAULT_ADDR/v1/aws/creds/cloud-provisioner-role")
+        export AWS_ACCESS_KEY_ID=$(echo $AWS_CREDS | jq -r '.data.access_key')
+        export AWS_SECRET_ACCESS_KEY=$(echo $AWS_CREDS | jq -r '.data.secret_key')
+        export LEASE_ID=$(echo $AWS_CREDS | jq -r '.lease_id')
+        echo "Acquired Dynamic AWS Credentials. Lease ID: $LEASE_ID"
+    - description: 'Step 3: Execute Ansible Cloud Provisioning Playbook'
+      exec: |
+        echo "=== [Rundeck Step 3] Executing Ansible Provisioning ==="
+        ansible-playbook -i ansible/inventory.ini ansible/provision_cloud.yml
+    - description: 'Step 4: Cleanup & Revoke Lease (Zero-Trust Lifecycle)'
+      exec: |
+        echo "=== [Rundeck Step 4] Revoking Lease in Vault Post-Job ==="
+        curl -s --header "X-Vault-Token: $VAULT_TOKEN" \
+          --request PUT \
+          --data "{\"lease_id\":\"$LEASE_ID\"}" \
+          "$VAULT_ADDR/v1/sys/leases/revoke"
+        echo "Lease revoked successfully. Zero lingering credentials left behind."

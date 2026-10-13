@@ -1,0 +1,40 @@
+services:
+  # 1. Centralized Secret Manager: HashiCorp Vault
+  vault:
+    image: hashicorp/vault:1.16.0
+    container_name: cpits-poc-vault
+    ports:
+      - "8210:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "root"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - cloud-net
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # 2. Public Cloud Simulator: Moto (IAM, STS, S3, EC2)
+  # Zero-cost, 100% open-source, license-free AWS offline emulator
+  localstack:
+    image: motoserver/moto:latest
+    container_name: cpits-poc-localstack
+    ports:
+      - "4566:5000"
+      - "5000:5000"
+    networks:
+      cloud-net:
+        aliases:
+          - localstack
+    environment:
+      - MOTO_PORT=5000
+
+networks:
+  cloud-net:
+    name: cloud-net
+    driver: bridge

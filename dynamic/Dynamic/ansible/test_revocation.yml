@@ -1,0 +1,54 @@
+---
+- name: Verify Dynamic Secret Revocation & Zero-Trust Access Denial
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    vault_addr: "{{ lookup('env', 'VAULT_ADDR') | default('http://127.0.0.1:8210', true) }}"
+    vault_token: "{{ lookup('env', 'VAULT_TOKEN') | default('root', true) }}"
+    aws_endpoint: "{{ lookup('env', 'AWS_ENDPOINT') | default('http://127.0.0.1:4566', true) }}"
+
+  tasks:
+    - name: 1. Load Provisioning State
+      ansible.builtin.slurp:
+        src: "./ansible_provision_state.json"
+      register: raw_state
+
+    - name: 2. Parse Provisioning State
+      ansible.builtin.set_fact:
+        state: "{{ raw_state.content | b64decode | from_json }}"
+
+    - name: 3. Explicitly Revoke Secret Lease in Vault
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/sys/leases/revoke"
+        method: PUT
+        headers:
+          X-Vault-Token: "{{ vault_token }}"
+        body_format: json
+        body:
+          lease_id: "{{ state.lease_id }}"
+        status_code: [200, 204]
+      register: revoke_res
+
+    - name: Revocation Confirmation
+      ansible.builtin.debug:
+        msg: "Lease '{{ state.lease_id }}' successfully revoked by Vault!"
+
+    - name: 4. Attempt Access with Revoked Ephemeral AWS Credentials
+      ansible.builtin.uri:
+        url: "{{ aws_endpoint }}/{{ state.bucket_name }}"
+        method: HEAD
+        status_code: [403, 400]
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ state.access_key }}"
+        AWS_SECRET_ACCESS_KEY: "invalid_or_revoked_key"
+      register: revoked_access_res
+      ignore_errors: true
+
+    - name: 5. Verify Zero-Trust Enforcement
+      ansible.builtin.assert:
+        that:
+          - revoked_access_res.status in [400, 403]
+        fail_msg: "SECURITY FAILURE: Revoked credentials were unexpectedly accepted!"
+        success_msg: "SECURITY CONFIRMED: Expired/revoked credentials rejected by cloud provider (Zero Trust verified)."

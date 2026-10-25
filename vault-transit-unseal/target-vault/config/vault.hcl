@@ -11,7 +11,7 @@ listener "tcp" {
 # Transit Auto-Unseal Block
 # ------------------------------------------------------------------------------
 seal "transit" {
-  address            = "http://vault-transit:8200"
+  address            = "http://transit-vault-server:8200"
   token              = "transit-autounseal-token"
   disable_renewal    = "false"
   key_name           = "autounseal"

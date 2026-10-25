@@ -113,9 +113,9 @@ def main():
         api_call(f"{TARGET_ADDR}/v1/{secret_path}", method="POST", data=payload, token=root_token)
         print(f"  [OK] Secret saved to '{secret_path}'")
 
-    # 5. Restart Target Vault to prove Auto-Unseal
-    print("\n[Step 5] Restarting Target Vault container ('vault-target-unsealed')...")
-    restart_res = subprocess.run(["docker", "restart", "vault-target-unsealed"], capture_output=True, text=True)
+    # 5. Restart Main Vault to prove Auto-Unseal
+    print("\n[Step 5] Restarting Main Vault container ('main-vault-server')...")
+    restart_res = subprocess.run(["docker", "restart", "main-vault-server"], capture_output=True, text=True)
     if restart_res.returncode != 0:
         print(f"  [WARN] Failed to restart container: {restart_res.stderr}")
     else:

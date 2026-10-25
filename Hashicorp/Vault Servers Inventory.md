@@ -24,9 +24,9 @@ graph TB
 
     subgraph DockerBridge ["Docker Engine (WSL2 / Linux Desktop)"]
         subgraph TransitStack ["Stack: vault-transit-unseal"]
-            KMS["vault-transit-kms<br/>(Dev Mode KMS Provider)<br/><b>ONLINE</b>"]
-            Target["vault-target-unsealed<br/>(Transit Auto-Unsealed)<br/><b>ONLINE</b>"]
-            Init["vault-transit-init<br/>(Provisioner)<br/><i>COMPLETED (Exited 0)</i>"]
+            KMS["transit-vault-server<br/>(Dev Mode KMS Provider)<br/><i>Status: STOPPED</i>"]
+            Target["main-vault-server<br/>(Transit Auto-Unsealed)<br/><i>Status: STOPPED</i>"]
+            Init["transit-vault-provisioner<br/>(Provisioner)<br/><i>COMPLETED (Exited 0)</i>"]
             
             Target -->|"POST /v1/transit/decrypt/autounseal"| KMS
             Init -.->|"Configure Engine & Policy"| KMS
@@ -55,19 +55,19 @@ graph TB
 
 | Container Name | Host Port | Internal Port | Unseal Mechanism | Storage Backend | Version | Status & Cluster ID |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`vault-transit-kms`** | `8100` | `8200` | In-Memory (Dev Mode) | In-Memory | `v1.16.0` | **ONLINE / UNSEALED**<br>`cluster_id: 061b8df1-302d-4e18-127b-c99e025b2dc4` |
-| **`cpits-poc-vault`** | `8210` | `8200` | Shamir Secret Sharing | Container Storage | `v1.16.0` | **ONLINE / UNSEALED**<br>`cluster_id: 2df4c8c7-51be-3c55-dcff-2ecc47dd05b8` |
-| **`vault-target-unsealed`** | `8220` | `8200` | **Transit Auto-Unseal**<br>(via `vault-transit-kms:8200`) | File (`/vault/data`) | `v1.16.0` | **ONLINE / UNSEALED**<br>`cluster_id: 33978874-01b4-e622-e41d-478461bf80f1` |
+| **`transit-vault-server`** | `8100` | `8200` | In-Memory (Dev Mode) | In-Memory | `v1.16.0` | **STOPPED** (Configured)<br>`cluster_id: 061b8df1-302d-4e18-127b-c99e025b2dc4` |
+| **`cpits-poc-vault`** | `8210` | `8200` | Shamir Secret Sharing | Container Storage | `v1.16.0` | **STOPPED** (Configured)<br>`cluster_id: 2df4c8c7-51be-3c55-dcff-2ecc47dd05b8` |
+| **`main-vault-server`** | `8220` | `8200` | **Transit Auto-Unseal**<br>(via `transit-vault-server:8200`) | File (`/vault/data`) | `v1.16.0` | **STOPPED** (Configured)<br>`cluster_id: 33978874-01b4-e622-e41d-478461bf80f1` |
 
 ### API Endpoints & Access Tokens
 
-1. **Transit KMS Vault (`vault-transit-kms`)**
+1. **Transit KMS Vault (`transit-vault-server`)**
    - **Web UI & API:** [http://127.0.0.1:8100](http://127.0.0.1:8100)
    - **Root Token:** `transit-root-token`
    - **Key Name:** `transit/keys/autounseal`
    - **Service Policy:** `autounseal`
 
-2. **Auto-Unsealed Target Vault (`vault-target-unsealed`)**
+2. **Auto-Unsealed Main Vault (`main-vault-server`)**
    - **Web UI & API:** [http://127.0.0.1:8220](http://127.0.0.1:8220)
    - **Root Token:** Stored in [`vault-transit-unseal/target_vault_keys.json`](file:///c:/Users/SHYBAS/OneDrive/AIP-C01-main/vault-transit-unseal/target_vault_keys.json)
    - **Unseal Behavior:** Auto-decrypts on startup with zero human intervention. Uses **Recovery Keys** instead of Shamir unseal keys.
@@ -104,10 +104,10 @@ To prevent port collision on the host machine, ports are partitioned as follows:
 
 | Port | Service | Bound To | Conflict Avoidance Strategy |
 | :--- | :--- | :--- | :--- |
-| **`8100`** | Transit KMS Server | Docker `vault-transit-kms` | Dedicated for the Auto-Unseal KMS provider. |
+| **`8100`** | Transit KMS Server | Docker `transit-vault-server` | Dedicated for the Auto-Unseal KMS provider. |
 | **`8200`** | Default Vault Port | Windows `vault.exe` / `dynamic-poc-vault` | Standard default Vault port. Only one can bind at a time. |
 | **`8210`** | Standalone PoC Server | Docker `cpits-poc-vault` | Shifted to `:8210` to avoid conflict with standard `:8200`. |
-| **`8220`** | Auto-Unsealed Vault | Docker `vault-target-unsealed` | Shifted to `:8220` for clean multi-instance testing. |
+| **`8220`** | Auto-Unsealed Vault | Docker `main-vault-server` | Shifted to `:8220` for clean multi-instance testing. |
 
 ---
 

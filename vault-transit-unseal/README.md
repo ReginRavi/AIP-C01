@@ -33,9 +33,9 @@ sequenceDiagram
 
 | Service | Container Name | Host Port | Internal Port | Purpose |
 |---|---|---|---|---|
-| **Transit Vault** | `vault-transit-kms` | `8100` | `8200` | Acts as the KMS. Exposes `transit/` secrets engine. |
-| **Transit Init** | `vault-transit-init` | N/A | N/A | Configures key `autounseal`, policy, and token. |
-| **Target Vault** | `vault-target-unsealed` | `8220` | `8200` | Configured with `seal "transit"`. Auto-unseals on boot. |
+| **Transit Vault** | `transit-vault-server` | `8100` | `8200` | Acts as the KMS. Exposes `transit/` secrets engine. |
+| **Transit Init** | `transit-vault-provisioner` | N/A | N/A | Configures key `autounseal`, policy, and token. |
+| **Main Vault** | `main-vault-server` | `8220` | `8200` | Configured with `seal "transit"`. Auto-unseals on boot. |
 
 ---
 
@@ -74,7 +74,7 @@ cd vault-transit-unseal
 curl http://127.0.0.1:8220/v1/sys/seal-status
 
 # Restart the container
-docker restart vault-target-unsealed
+docker restart main-vault-server
 
 # Check status again - immediately unsealed!
 curl http://127.0.0.1:8220/v1/sys/seal-status

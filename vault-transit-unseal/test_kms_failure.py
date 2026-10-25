@@ -42,40 +42,40 @@ def main():
     print(f"  Target Vault Sealed     : {status.get('sealed')} (Expected: False - currently working)")
 
     # Step 2: Simulate KMS Outage by PAUSING Transit Vault
-    print("\n[Step 2] SIMULATING OUTAGE: Freezing Transit KMS ('docker pause vault-transit-kms')...")
-    run_cmd("docker pause vault-transit-kms")
+    print("\n[Step 2] SIMULATING OUTAGE: Freezing Transit KMS ('docker pause transit-vault-server')...")
+    run_cmd("docker pause transit-vault-server")
     print("  [OK] Transit KMS is now completely FROZEN / UNREACHABLE.")
 
-    # Step 3: Restart Target Vault while KMS is down
-    print("\n[Step 3] Restarting Target Vault container ('vault-target-unsealed')...")
-    run_cmd("docker restart -t 2 vault-target-unsealed")
-    print("  Target Vault container restarted.")
-    print("  Waiting 5 seconds for Target Vault startup attempt...")
+    # Step 3: Restart Main Vault while KMS is down
+    print("\n[Step 3] Restarting Main Vault container ('main-vault-server')...")
+    run_cmd("docker restart -t 2 main-vault-server")
+    print("  Main Vault container restarted.")
+    print("  Waiting 5 seconds for Main Vault startup attempt...")
     time.sleep(5)
 
-    # Step 4: Check Target Vault status - it CANNOT unseal!
-    print("\n[Step 4] Checking Target Vault status while KMS is UNREACHABLE...")
+    # Step 4: Check Main Vault status - it CANNOT unseal!
+    print("\n[Step 4] Checking Main Vault status while KMS is UNREACHABLE...")
     status_down = get_target_seal_status()
-    print(f"  API Response from Target Vault: {status_down}")
+    print(f"  API Response from Main Vault: {status_down}")
     
-    logs = run_cmd("docker logs --tail 8 vault-target-unsealed")
-    print("\n  Target Vault Logs during KMS outage:")
+    logs = run_cmd("docker logs --tail 8 main-vault-server")
+    print("\n  Main Vault Logs during KMS outage:")
     for line in logs.splitlines():
         print(f"    {line}")
 
     print("\n  ================================================================")
     print("  OBSERVATION CONFIRMED:")
-    print("  Target Vault CANNOT boot or unseal because the Transit KMS is unreachable!")
+    print("  Main Vault CANNOT boot or unseal because the Transit KMS is unreachable!")
     print("  ================================================================")
 
     # Step 5: Restore Transit KMS
-    print("\n[Step 5] RESTORING TRANSIT KMS ('docker unpause vault-transit-kms')...")
-    run_cmd("docker unpause vault-transit-kms")
+    print("\n[Step 5] RESTORING TRANSIT KMS ('docker unpause transit-vault-server')...")
+    run_cmd("docker unpause transit-vault-server")
     print("  [OK] Transit KMS is now ACTIVE and responding.")
 
-    # Step 6: Restart Target Vault now that KMS is back
-    print("\n[Step 6] Restarting Target Vault now that KMS is restored...")
-    run_cmd("docker restart vault-target-unsealed")
+    # Step 6: Restart Main Vault now that KMS is back
+    print("\n[Step 6] Restarting Main Vault now that KMS is restored...")
+    run_cmd("docker restart main-vault-server")
     print("  Waiting 5 seconds for Target Vault to contact KMS and auto-unseal...")
     time.sleep(5)
 

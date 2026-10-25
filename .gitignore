@@ -49,4 +49,5 @@ __pycache__/
 htmlcov/
 venv/
 .venv/
-
+# Vault local test keys
+target_vault_keys.json

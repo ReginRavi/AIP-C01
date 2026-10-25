@@ -1,0 +1,72 @@
+version: '3.8'
+
+networks:
+  vault-transit-net:
+    driver: bridge
+
+volumes:
+  target_vault_data:
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Transit Vault (Acts as the Centralized KMS / Auto-Unseal Provider)
+  # ----------------------------------------------------------------------------
+  vault-transit:
+    image: hashicorp/vault:1.16.0
+    container_name: vault-transit-kms
+    restart: unless-stopped
+    networks:
+      - vault-transit-net
+    ports:
+      - "8100:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "transit-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  # ----------------------------------------------------------------------------
+  # 2. Transit Provisioner: Prepares Transit Engine, Key, Policy, and Token
+  # ----------------------------------------------------------------------------
+  vault-transit-init:
+    image: hashicorp/vault:1.16.0
+    container_name: vault-transit-init
+    restart: "no"
+    networks:
+      - vault-transit-net
+    depends_on:
+      vault-transit:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault-transit:8200"
+      VAULT_TOKEN: "transit-root-token"
+    volumes:
+      - ./transit-vault/init-transit.sh:/init-transit.sh:ro
+    entrypoint: ["/bin/sh", "/init-transit.sh"]
+
+  # ----------------------------------------------------------------------------
+  # 3. Target Vault (Uses Transit Auto-Unseal instead of manual Shamir unseal)
+  # ----------------------------------------------------------------------------
+  vault-target:
+    image: hashicorp/vault:1.16.0
+    container_name: vault-target-unsealed
+    restart: unless-stopped
+    networks:
+      - vault-transit-net
+    ports:
+      - "8220:8200"
+    depends_on:
+      vault-transit-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./target-vault/config/vault.hcl:/vault/config/vault.hcl:ro
+      - target_vault_data:/vault/data
+    cap_add:
+      - IPC_LOCK
+    entrypoint: ["vault", "server", "-config=/vault/config/vault.hcl"]
